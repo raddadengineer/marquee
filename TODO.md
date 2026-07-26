@@ -67,6 +67,9 @@
       reproducible installs. Verified live: existing sessions, Uptime Kuma
       reads, and the login log all still work against the pre-upgrade
       on-disk data with zero migration needed
+- [x] CI: `npm test` now runs automatically on every push to main via
+      GitHub Actions, showing a pass/fail check right on the repo — no
+      longer relies on someone remembering to run it by hand
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks
