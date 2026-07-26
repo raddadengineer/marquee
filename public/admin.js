@@ -24,6 +24,8 @@
   setInterval(loadWanted, 60000);
   loadImportIssues();
   setInterval(loadImportIssues, 30000);
+  loadIndexers();
+  setInterval(loadIndexers, 60000);
 })();
 
 document.getElementById('admin-logout-btn').addEventListener('click', async () => {
@@ -333,3 +335,22 @@ document.getElementById('import-issues-body').addEventListener('click', async e 
     btn.querySelector('.btn-label').textContent = 'Remove';
   }
 });
+
+// ---------- Stack: Indexers ----------
+// Read-only health check, reusing the same .monitor-pill component already
+// used for Uptime Kuma monitors above — same "dot + name" shape fits fine
+// for "is this indexer working" too.
+async function loadIndexers() {
+  const body = document.getElementById('indexers-body');
+  try {
+    const results = await api('/api/prowlarr/indexers');
+    if (!results.length) { body.innerHTML = '<p class="empty-state">No indexers configured.</p>'; return; }
+    body.innerHTML = `<div class="monitor-pills">${results.map(i => `
+      <span class="monitor-pill ${i.healthy ? 'up' : 'down'}" title="${escapeHtml(i.reason || '')}">
+        <span class="${dotClass(!i.healthy)}"></span>${escapeHtml(i.name)}
+      </span>
+    `).join('')}</div>`;
+  } catch (e) {
+    body.innerHTML = '<p class="empty-state">Could not load indexers.</p>';
+  }
+}

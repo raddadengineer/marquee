@@ -55,6 +55,7 @@ app.use('/api/radarr', require('./routes/radarr'));
 app.use('/api/overseerr', require('./routes/overseerr'));
 app.use('/api/downloads', require('./routes/downloads'));
 app.use('/api/owner', require('./routes/owner'));
+app.use('/api/prowlarr', require('./routes/prowlarr'));
 
 // index.html carries a {{SITE_NAME}} placeholder so this same image can show a generic
 // "Marquee" brand out of the box, or your own (e.g. via SITE_NAME=MyPlexHub in .env).
