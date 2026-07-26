@@ -20,6 +20,8 @@
   setInterval(loadPendingRequests, 30000);
   loadAdminIssues();
   setInterval(loadAdminIssues, 30000);
+  loadDownloadIssues();
+  setInterval(loadDownloadIssues, 15000);
   loadWanted();
   setInterval(loadWanted, 60000);
   loadImportIssues();
@@ -250,6 +252,75 @@ async function openReleaseModal(ctx) {
 
 document.getElementById('close-release-modal-btn').addEventListener('click', () => {
   document.getElementById('release-modal').classList.add('hidden');
+});
+
+// ---------- Stack: Download Issues ----------
+// Not actively downloading and not seeding/complete — i.e. actually stuck or
+// failed. Most torrents that are simply idling-while-seeding never show up
+// here at all (filtered server-side), so this is meant to stay short.
+async function loadDownloadIssues() {
+  const body = document.getElementById('download-issues-body');
+  try {
+    const items = await api('/api/downloads/queue/attention');
+    if (!items.length) { body.innerHTML = '<p class="empty-state">Nothing stuck.</p>'; return; }
+    body.innerHTML = items.map(d => `
+      <div class="dl-row" data-id="${escapeHtml(d.id)}" data-type="${d.type}">
+        <div class="dl-row-body">
+          <div class="now-title">${escapeHtml(d.name)}</div>
+          <div class="now-meta">
+            <span class="state-dot paused"></span>
+            ${d.type === 'torrent' ? 'Torrent' : 'Usenet'} · ${titleCase(d.state)}
+          </div>
+        </div>
+        <div class="pending-actions">
+          <button class="dl-action-btn pill-btn" data-action="${d.state === 'paused' ? 'resume' : 'pause'}">
+            <span class="state-dot"></span><span class="btn-label">${d.state === 'paused' ? 'Resume' : 'Pause'}</span>
+          </button>
+          <button class="dl-remove-btn pill-btn">
+            <span class="state-dot danger"></span><span class="btn-label">Remove</span>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    body.innerHTML = '<p class="empty-state">Could not load download issues.</p>';
+  }
+}
+
+document.getElementById('download-issues-body').addEventListener('click', async e => {
+  const row = e.target.closest('.dl-row');
+  if (!row) return;
+
+  const removeBtn = e.target.closest('.dl-remove-btn');
+  if (removeBtn) {
+    if (!confirm('Remove this download and delete any downloaded files?')) return;
+    row.querySelectorAll('button').forEach(b => b.disabled = true);
+    removeBtn.querySelector('.btn-label').textContent = '…';
+    try {
+      await api(`/api/downloads/queue/${row.dataset.type}/${row.dataset.id}`, { method: 'DELETE' });
+      row.remove();
+      if (!document.getElementById('download-issues-body').children.length) {
+        document.getElementById('download-issues-body').innerHTML = '<p class="empty-state">Nothing stuck.</p>';
+      }
+    } catch (err) {
+      row.querySelectorAll('button').forEach(b => b.disabled = false);
+      removeBtn.querySelector('.btn-label').textContent = 'Remove';
+    }
+    return;
+  }
+
+  const actionBtn = e.target.closest('.dl-action-btn');
+  if (!actionBtn) return;
+  const action = actionBtn.dataset.action;
+  row.querySelectorAll('button').forEach(b => b.disabled = true);
+  actionBtn.querySelector('.btn-label').textContent = '…';
+  try {
+    await api(`/api/downloads/queue/${row.dataset.type}/${row.dataset.id}/${action}`, { method: 'POST' });
+    loadDownloadIssues(); // refetch so the row reflects the real new state
+  } catch (err) {
+    row.querySelectorAll('button').forEach(b => b.disabled = false);
+    actionBtn.querySelector('.btn-label').textContent = action === 'pause' ? 'Pause' : 'Resume';
+  }
 });
 
 // ---------- Stack: Wanted / Missing ----------

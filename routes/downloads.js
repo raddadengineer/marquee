@@ -6,19 +6,33 @@ const qbittorrent = require('../lib/qbittorrent');
 const sabnzbd = require('../lib/sabnzbd');
 const router = express.Router();
 
-router.get('/queue', requireAuth, async (req, res) => {
+async function fetchAll() {
   const [torrents, usenet] = await Promise.all([
     settle('qbittorrent queue', process.env.QBITTORRENT_URL ? qbittorrent.getTorrents() : Promise.resolve([]), []),
     settle('sabnzbd queue', process.env.SABNZBD_URL ? sabnzbd.getQueue() : Promise.resolve([]), [])
   ]);
-  // Excludes "seeding" (fully downloaded, just sharing back out) — this is meant
-  // to answer "what's coming in or stuck right now," not double as a full
-  // torrent/usenet client. Paused/stalled/queued/error are included (unlike
-  // before) so the owner-only pause/resume/remove actions below have something
-  // to act on — a paused item that then vanished from the list would have no
-  // way to be resumed from here.
-  const items = [...torrents, ...usenet].filter(item => item.state !== 'seeding');
+  return [...torrents, ...usenet];
+}
+
+router.get('/queue', requireAuth, async (req, res) => {
+  // Actively downloading only — this answers "what's coming in right now" for
+  // everyone, not "manage my whole torrent/usenet client." Anything stuck
+  // (paused/stalled/error/queued) is owner-only, see /queue/attention below —
+  // most of what shows up there in practice is fully-downloaded torrents
+  // stalled/paused/queued while seeding, which nobody but the owner needs to
+  // see and even they don't need to see constantly.
+  const items = (await fetchAll()).filter(item => item.state === 'downloading');
   items.sort((a, b) => b.progress - a.progress);
+  res.json(items);
+});
+
+router.get('/queue/attention', requireAuth, requireOwner, async (req, res) => {
+  // Not downloading and not seeding/complete — i.e. actually stuck or failed,
+  // the things worth an owner's Pause/Resume/Remove action. Excludes
+  // "seeding" specifically because a torrent that's 100% done and just
+  // paused/stalled/queued while trying to seed isn't a download problem.
+  const items = (await fetchAll()).filter(item => item.state !== 'downloading' && item.state !== 'seeding');
+  items.sort((a, b) => a.name.localeCompare(b.name));
   res.json(items);
 });
 
