@@ -41,26 +41,80 @@ router.get('/now-playing/stream', requireAuth, (req, res) => {
   req.on('close', () => nowPlaying.removeClient(res));
 });
 
+// Tautulli logs a "newly added" event at whatever level Plex added it — a
+// whole show, a whole season, or one episode at a time — so identifying
+// "which show is this about" and "what's its poster" both depend on which of
+// the three the row actually is.
+function showIdentity(i) {
+  if (i.media_type === 'episode') return { key: i.grandparent_rating_key, title: i.grandparent_title, thumb: i.grandparent_thumb };
+  if (i.media_type === 'season') return { key: i.parent_rating_key, title: i.parent_title, thumb: i.parent_thumb };
+  if (i.media_type === 'show') return { key: i.rating_key, title: i.title, thumb: i.thumb };
+  return null; // movies aren't grouped
+}
+function seasonNumberFor(i) {
+  if (i.media_type === 'episode') return i.parent_media_index;
+  if (i.media_type === 'season') return i.media_index;
+  return null;
+}
+function singleEventLabel(i) {
+  if (i.media_type === 'episode') return `S${i.parent_media_index}E${i.media_index}`;
+  if (i.media_type === 'season') return `Season ${i.media_index}`;
+  return null;
+}
+
 async function fetchRecentlyAdded(sectionId) {
   const params = {
     apikey: process.env.TAUTULLI_API_KEY,
     cmd: 'get_recently_added',
-    count: 10 // desktop shows up to 10 in the scroll row; mobile slices this down to 6
+    // Fetched well beyond the ~10 we'll display — grouping episodes of the same
+    // show together (below) needs headroom, since a season-pack drop can
+    // otherwise fill the whole raw feed with one show's episodes and crowd out
+    // everything else before grouping gets a chance to help.
+    count: 30
   };
   if (sectionId) params.section_id = sectionId;
   const { data } = await axios.get(`${process.env.TAUTULLI_URL}/api/v2`, { params });
-  return (data.response.data.recently_added || []).map(i => ({
-    title: i.grandparent_title
-      ? `${i.grandparent_title} — S${i.parent_media_index}E${i.media_index}`
-      : i.title,
-    year: i.year,
-    type: i.media_type,
-    overview: i.summary || '',
-    addedAt: Number(i.added_at) * 1000,
-    // For episodes, show the series poster (grandparent_thumb) rather than the
-    // individual episode still — matches what a "recently added" grid should read as.
-    thumb: imageUrl(i.grandparent_thumb || i.thumb)
-  }));
+  const rows = data.response.data.recently_added || [];
+
+  // Groups every row belonging to the same show into one entry — a season
+  // pack (or a backfill that logs a burst of individual episodes) collapses
+  // into a single tile instead of flooding the row with one per episode.
+  const groups = new Map();
+  for (const i of rows) {
+    const show = showIdentity(i);
+    const key = show?.key || `solo-${i.rating_key}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        title: show ? show.title : i.title,
+        thumb: imageUrl(show ? show.thumb : i.thumb),
+        year: i.year,
+        type: i.media_type,
+        overview: i.summary || '',
+        addedAt: Number(i.added_at) * 1000,
+        singleLabel: singleEventLabel(i),
+        seasons: new Set(),
+        eventCount: 0
+      });
+    }
+    const g = groups.get(key);
+    g.addedAt = Math.max(g.addedAt, Number(i.added_at) * 1000);
+    g.eventCount += 1;
+    const seasonNum = seasonNumberFor(i);
+    if (seasonNum) g.seasons.add(seasonNum);
+  }
+
+  return [...groups.values()].slice(0, 10).map(g => {
+    let title = g.title;
+    if (g.eventCount === 1) {
+      if (g.singleLabel) title = `${g.title} — ${g.singleLabel}`;
+    } else {
+      // Multiple rows collapsed together — name the season if they're all
+      // from the same one, otherwise this spans a mixed batch.
+      const seasons = [...g.seasons];
+      title = seasons.length === 1 ? `${g.title} — Season ${seasons[0]}` : `${g.title} — new episodes`;
+    }
+    return { title, year: g.year, type: g.type, overview: g.overview, addedAt: g.addedAt, thumb: g.thumb };
+  });
 }
 
 router.get('/recently-added', requireAuth, async (req, res) => {
