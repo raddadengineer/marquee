@@ -145,17 +145,42 @@
   </div>
 </div>
 
-<!-- SETTINGS MODAL -->
+<!-- SETTINGS MODAL: service health grid -->
 <div id="settings-modal" class="modal hidden">
   <div class="modal-card settings-card">
     <div class="modal-head">
       <h3>Settings</h3>
       <button id="close-settings-btn" class="pill-btn pill-btn-icon">&#10005;</button>
     </div>
-    <p class="discover-label">Saved changes take effect after a brief automatic restart (a few seconds).</p>
-    <div id="settings-body" class="settings-body"><p class="empty-state">Loading…</p></div>
-    <p id="settings-status" class="settings-status hidden"></p>
-    <button id="settings-save-btn" class="btn-primary" disabled>Save &amp; Restart</button>
+    <div class="settings-body">
+      <div class="settings-section-row">
+        <h4 class="admin-subhead">Integrated Service Health &amp; Latency</h4>
+        <button id="run-health-check-btn" class="pill-btn"><span class="state-dot"></span>Run Health Check</button>
+      </div>
+      <div id="service-grid" class="service-grid"><p class="empty-state">Loading…</p></div>
+
+      <div class="settings-section-row settings-section-row-spaced">
+        <h4 class="admin-subhead">Server &amp; Deployment Configuration</h4>
+        <button id="edit-deployment-btn" class="pill-btn"><span class="state-dot"></span>Edit Deployment Settings</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS EDIT POPUP: shared by each service card's Edit button and
+     Edit Deployment Settings — whichever was opened last populates this. -->
+<div id="settings-edit-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="settings-edit-title">Configuration</h3>
+      <button id="close-settings-edit-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+    <div id="settings-edit-body" class="settings-body"><p class="empty-state">Loading…</p></div>
+    <p id="settings-edit-status" class="settings-status hidden"></p>
+    <div class="settings-edit-actions">
+      <button id="settings-edit-cancel-btn" class="pill-btn">Cancel</button>
+      <button id="settings-edit-save-btn" class="btn-primary" disabled>Save Changes</button>
+    </div>
   </div>
 </div>
 

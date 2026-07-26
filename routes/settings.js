@@ -4,6 +4,8 @@ const path = require('path');
 const requireAuth = require('./requireAuth');
 const requireOwner = require('./requireOwner');
 const { parseFields, applyUpdates, isSecretKey, isBooleanValue } = require('../lib/envFile');
+const { SERVICES } = require('../lib/serviceRegistry');
+const serviceHealth = require('../lib/serviceHealth');
 const router = express.Router();
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
@@ -14,26 +16,68 @@ const ENV_PATH = path.join(__dirname, '..', '.env');
 // which defeats the point of this page. Shown read-only instead of editable.
 const READONLY_KEYS = new Set(['PORT', 'HOST_PORT', 'CONTAINER_NAME']);
 
-router.get('/', requireAuth, requireOwner, (req, res) => {
+// Every key any SERVICES entry claims — whatever's left over is "deployment"
+// config (site branding, session/cookie behavior, port, etc.), not tied to a
+// specific integration.
+const SERVICE_KEYS = new Set(SERVICES.flatMap(s => s.fields.map(f => f.key)));
+
+function toClientField(f) {
+  const secret = isSecretKey(f.key);
+  return {
+    key: f.key,
+    label: f.label,
+    description: f.description,
+    readOnly: READONLY_KEYS.has(f.key),
+    isSecret: secret,
+    isBoolean: !secret && isBooleanValue(f.value),
+    hasValue: !!f.value,
+    value: secret ? undefined : f.value
+  };
+}
+
+function currentValues() {
+  if (!fs.existsSync(ENV_PATH)) return null;
+  const map = new Map();
+  for (const f of parseFields(fs.readFileSync(ENV_PATH, 'utf8'))) map.set(f.key, f.value);
+  return map;
+}
+
+// Health grid for the Settings modal's service cards. Runs a real live check
+// against each configured integration (in parallel) — see lib/serviceHealth.js
+// for exactly what each one does and why.
+router.get('/services', requireAuth, requireOwner, async (req, res) => {
+  try {
+    const health = await serviceHealth.checkAll();
+    res.json(SERVICES.map(s => ({ key: s.key, label: s.label, health: health[s.key] })));
+  } catch (err) {
+    console.error('settings services health error:', err.message);
+    res.status(502).json({ error: 'Could not run health checks' });
+  }
+});
+
+// One service's editable fields, for its "Edit" popup — fetched lazily
+// rather than shipping every service's fields (including which secrets are
+// set) on every page load.
+router.get('/services/:key', requireAuth, requireOwner, (req, res) => {
+  const service = SERVICES.find(s => s.key === req.params.key);
+  if (!service) return res.status(404).json({ error: 'Unknown service' });
+  const values = currentValues();
+  if (!values) return res.status(404).json({ error: '.env not found — this deployment may not have it mounted into the container' });
+  res.json({
+    key: service.key,
+    label: service.label,
+    fields: service.fields.map(f => toClientField({ ...f, value: values.get(f.key) || '' }))
+  });
+});
+
+// Everything not claimed by a specific integration — site branding, session/
+// cookie behavior, port, etc. — for the "Edit Deployment Settings" popup.
+router.get('/deployment', requireAuth, requireOwner, (req, res) => {
   if (!fs.existsSync(ENV_PATH)) {
     return res.status(404).json({ error: '.env not found — this deployment may not have it mounted into the container' });
   }
-  const fields = parseFields(fs.readFileSync(ENV_PATH, 'utf8'));
-  res.json(fields.map(f => {
-    const secret = isSecretKey(f.key);
-    return {
-      key: f.key,
-      section: f.section,
-      description: f.description,
-      readOnly: READONLY_KEYS.has(f.key),
-      isSecret: secret,
-      isBoolean: !secret && isBooleanValue(f.value),
-      hasValue: !!f.value,
-      // Secrets are never sent to the browser, not even to prefill the form —
-      // only whether one is currently set (hasValue above).
-      value: secret ? undefined : f.value
-    };
-  }));
+  const fields = parseFields(fs.readFileSync(ENV_PATH, 'utf8')).filter(f => !SERVICE_KEYS.has(f.key));
+  res.json(fields.map(f => toClientField({ key: f.key, label: f.key, description: f.description, value: f.value })));
 });
 
 router.post('/', requireAuth, requireOwner, (req, res) => {

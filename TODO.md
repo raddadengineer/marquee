@@ -75,15 +75,21 @@
       session-only figure), plus total uploaded/downloaded — just the
       numbers, no file list
 - [x] Admin: Settings page — edit .env values from the browser instead of a
-      terminal, grouped by the file's own section comments. Secrets (API
-      keys, tokens, passwords) are masked and never sent to the browser;
-      leaving one blank keeps it unchanged. Boolean values get a toggle
-      switch. Infrastructure-critical keys (PORT/HOST_PORT/CONTAINER_NAME)
-      are read-only since changing them can make the app unreachable.
-      Saving triggers a real container restart (Node only loads env vars
-      once, at process start) — the page polls until it's back and reloads
-      itself. Verified live end-to-end: write, restart, session persistence
-      all confirmed against the real deployment
+      terminal. Organized by integration (Plex/Tautulli/Overseerr/Sonarr/
+      Radarr/qBittorrent/SABnzbd/Uptime Kuma/NUT UPS), each shown as a card
+      with a real live health check (Online/Unconfigured/Error, latency,
+      version — actually pings the service, not just "is it configured"),
+      plus an Edit popup with friendly per-field labels/descriptions.
+      Everything not tied to a specific integration (site branding, session/
+      cookie behavior, port) lives in a separate Deployment Configuration
+      popup. Secrets are masked and never sent to the browser; leaving one
+      blank keeps it unchanged. Infrastructure-critical keys (PORT/HOST_PORT/
+      CONTAINER_NAME) are read-only since changing them can make the app
+      unreachable. Saving triggers a real container restart (Node only loads
+      env vars once, at process start) — the popup polls until it's back and
+      reloads itself. Verified live end-to-end: all 9 services report real
+      status/latency/version, write+restart+session persistence all
+      confirmed against the real deployment
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks

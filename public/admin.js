@@ -794,49 +794,100 @@ async function loadIndexers() {
 }
 
 // ---------- Settings ----------
-// Edits .env directly through routes/settings.js. Secrets are never sent to
-// the browser (only whether one is currently set) — leaving a secret field
-// blank means "don't change it," not "clear it." Node only loads env vars
-// once at process start, so any save triggers a real container restart
-// (the save endpoint exits the process; Docker's restart:unless-stopped
-// policy brings it back up with the new values) — this page then polls
-// until the server responds again and reloads itself.
-let settingsFields = [];
+// Two layers: an overview modal (service health grid + a Deployment button),
+// and a shared edit popup that either a service card's Edit button or the
+// Deployment button populates. Secrets are never sent to the browser (only
+// whether one is currently set) — leaving a secret field blank means "don't
+// change it," not "clear it." Node only loads env vars once at process
+// start, so any save triggers a real container restart (the save endpoint
+// exits the process; Docker's restart:unless-stopped policy brings it back
+// up with the new values) — the edit popup then polls until the server
+// responds again and reloads the page.
 
 document.getElementById('open-settings-btn').addEventListener('click', openSettings);
 
 async function openSettings() {
-  const modal = document.getElementById('settings-modal');
-  const body = document.getElementById('settings-body');
-  const saveBtn = document.getElementById('settings-save-btn');
-  const status = document.getElementById('settings-status');
+  document.getElementById('settings-modal').classList.remove('hidden');
+  loadServiceHealth();
+}
+
+document.getElementById('close-settings-btn').addEventListener('click', () => {
+  document.getElementById('settings-modal').classList.add('hidden');
+});
+
+document.getElementById('run-health-check-btn').addEventListener('click', loadServiceHealth);
+
+async function loadServiceHealth() {
+  const grid = document.getElementById('service-grid');
+  grid.innerHTML = '<p class="empty-state">Checking services…</p>';
+  try {
+    const services = await api('/api/settings/services');
+    grid.innerHTML = services.map(s => {
+      const h = s.health || { status: 'unconfigured' };
+      const statusText = h.status === 'online'
+        ? escapeHtml(String(h.detail))
+        : h.status === 'error' ? escapeHtml(h.message || 'Unreachable') : 'Not configured';
+      const badgeLabel = h.status === 'online' ? 'Online' : h.status === 'error' ? 'Error' : 'Unconfigured';
+      return `
+        <div class="service-card">
+          <div class="service-card-head">
+            <span class="service-card-name">${escapeHtml(s.label)}</span>
+            <span class="service-badge ${h.status}">${badgeLabel}</span>
+          </div>
+          <div class="service-card-meta">${h.status === 'online' ? `&#9889; ${h.latencyMs}ms` : ''}</div>
+          <div class="service-card-foot">
+            <span class="service-card-status-text" title="${statusText}">${statusText}</span>
+            <button class="pill-btn" data-service="${s.key}" data-label="${escapeHtml(s.label)}">Edit &#9998;</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    grid.innerHTML = `<p class="empty-state">${escapeHtml(e.message || 'Could not check services.')}</p>`;
+  }
+}
+
+document.getElementById('service-grid').addEventListener('click', e => {
+  const btn = e.target.closest('[data-service]');
+  if (!btn) return;
+  openSettingsEdit(`/api/settings/services/${btn.dataset.service}`, `${btn.dataset.label} Configuration`);
+});
+
+document.getElementById('edit-deployment-btn').addEventListener('click', () => {
+  openSettingsEdit('/api/settings/deployment', 'Deployment Configuration');
+});
+
+// ---- Shared edit popup ----
+let settingsEditFields = [];
+
+async function openSettingsEdit(url, title) {
+  const modal = document.getElementById('settings-edit-modal');
+  const body = document.getElementById('settings-edit-body');
+  const saveBtn = document.getElementById('settings-edit-save-btn');
+  const status = document.getElementById('settings-edit-status');
+  document.getElementById('settings-edit-title').textContent = title;
   status.className = 'settings-status hidden';
   status.textContent = '';
   saveBtn.disabled = true;
-  saveBtn.textContent = 'Save & Restart';
+  saveBtn.textContent = 'Save Changes';
   body.innerHTML = '<p class="empty-state">Loading…</p>';
   modal.classList.remove('hidden');
 
   try {
-    settingsFields = await api('/api/settings');
-    renderSettings();
+    const data = await api(url);
+    settingsEditFields = data.fields || data; // /deployment returns a bare array, /services/:key returns {fields}
+    renderSettingsEdit();
   } catch (e) {
     body.innerHTML = `<p class="empty-state">${escapeHtml(e.message || 'Could not load settings.')}</p>`;
   }
 }
 
-function renderSettings() {
-  const body = document.getElementById('settings-body');
-  let lastSection;
-  body.innerHTML = settingsFields.map(f => {
-    let sectionHtml = '';
-    if (f.section !== lastSection) {
-      lastSection = f.section;
-      sectionHtml = `<div class="settings-section-label">${escapeHtml(f.section || 'Other')}</div>`;
-    }
+function renderSettingsEdit() {
+  const body = document.getElementById('settings-edit-body');
+  body.innerHTML = settingsEditFields.map(f => {
     let inputHtml;
     if (f.readOnly) {
-      inputHtml = `<input class="settings-input" type="text" value="${escapeHtml(f.value || '')}" disabled title="Read-only — changing this could make the app unreachable">`;
+      inputHtml = `<input class="settings-input-full" type="text" value="${escapeHtml(f.value || '')}" disabled title="Read-only — changing this could make the app unreachable">`;
     } else if (f.isBoolean) {
       inputHtml = `
         <label class="settings-toggle">
@@ -846,32 +897,29 @@ function renderSettings() {
       `;
     } else if (f.isSecret) {
       const placeholder = f.hasValue ? '•••• set — leave blank to keep' : 'Not set';
-      inputHtml = `<input class="settings-input" type="password" data-key="${f.key}" data-type="secret" placeholder="${placeholder}" autocomplete="off">`;
+      inputHtml = `<input class="settings-input-full" type="password" data-key="${f.key}" data-type="secret" placeholder="${placeholder}" autocomplete="off">`;
     } else {
-      inputHtml = `<input class="settings-input" type="text" data-key="${f.key}" data-type="text" value="${escapeHtml(f.value || '')}">`;
+      inputHtml = `<input class="settings-input-full" type="text" data-key="${f.key}" data-type="text" value="${escapeHtml(f.value || '')}">`;
     }
     return `
-      ${sectionHtml}
-      <div class="settings-field">
-        <div class="settings-field-label">
-          <span class="settings-field-key">${escapeHtml(f.key)}</span>
-          ${f.description ? `<div class="settings-field-desc">${escapeHtml(f.description)}</div>` : ''}
-        </div>
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">${escapeHtml(f.label || f.key)}</label>
         ${inputHtml}
+        ${f.description ? `<p class="settings-field-block-desc">${escapeHtml(f.description)}</p>` : ''}
       </div>
     `;
   }).join('');
   body.querySelectorAll('[data-key]').forEach(el => {
-    el.addEventListener('input', updateSettingsSaveState);
-    el.addEventListener('change', updateSettingsSaveState);
+    el.addEventListener('input', updateSettingsEditSaveState);
+    el.addEventListener('change', updateSettingsEditSaveState);
   });
 }
 
-function collectSettingsChanges() {
+function collectSettingsEditChanges() {
   const changes = {};
-  document.querySelectorAll('#settings-body [data-key]').forEach(el => {
+  document.querySelectorAll('#settings-edit-body [data-key]').forEach(el => {
     const key = el.dataset.key;
-    const field = settingsFields.find(f => f.key === key);
+    const field = settingsEditFields.find(f => f.key === key);
     if (el.dataset.type === 'boolean') {
       const newValue = el.checked ? 'true' : 'false';
       if (newValue !== field.value) changes[key] = newValue;
@@ -884,16 +932,18 @@ function collectSettingsChanges() {
   return changes;
 }
 
-function updateSettingsSaveState() {
-  document.getElementById('settings-save-btn').disabled = !Object.keys(collectSettingsChanges()).length;
+function updateSettingsEditSaveState() {
+  document.getElementById('settings-edit-save-btn').disabled = !Object.keys(collectSettingsEditChanges()).length;
 }
 
-document.getElementById('close-settings-btn').addEventListener('click', () => {
-  document.getElementById('settings-modal').classList.add('hidden');
-});
+document.getElementById('close-settings-edit-btn').addEventListener('click', closeSettingsEdit);
+document.getElementById('settings-edit-cancel-btn').addEventListener('click', closeSettingsEdit);
+function closeSettingsEdit() {
+  document.getElementById('settings-edit-modal').classList.add('hidden');
+}
 
-document.getElementById('settings-save-btn').addEventListener('click', async () => {
-  const changes = collectSettingsChanges();
+document.getElementById('settings-edit-save-btn').addEventListener('click', async () => {
+  const changes = collectSettingsEditChanges();
   if (!Object.keys(changes).length) return;
 
   const changingSessionSecret = Object.prototype.hasOwnProperty.call(changes, 'SESSION_SECRET');
@@ -902,8 +952,8 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
     : 'Save these changes? The app will restart (a few seconds of downtime) and this page will reload automatically.';
   if (!confirm(warning)) return;
 
-  const saveBtn = document.getElementById('settings-save-btn');
-  const status = document.getElementById('settings-status');
+  const saveBtn = document.getElementById('settings-edit-save-btn');
+  const status = document.getElementById('settings-edit-status');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving…';
   status.className = 'settings-status';
@@ -919,7 +969,7 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
     status.className = 'settings-status error';
     status.textContent = e.message || 'Could not save settings.';
     saveBtn.disabled = false;
-    saveBtn.textContent = 'Save & Restart';
+    saveBtn.textContent = 'Save Changes';
   }
 });
 
@@ -936,5 +986,5 @@ async function waitForSettingsRestart() {
     } catch (e) { /* still down — keep polling */ }
     await new Promise(r => setTimeout(r, 1500));
   }
-  document.getElementById('settings-status').textContent = 'Taking longer than expected — try reloading the page manually.';
+  document.getElementById('settings-edit-status').textContent = 'Taking longer than expected — try reloading the page manually.';
 }
