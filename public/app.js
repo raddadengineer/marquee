@@ -147,14 +147,15 @@ function showAvailableToast({ title, poster }) {
   container.prepend(toast);
 }
 
-function renderNowPlaying(sessions) {
+function renderNowPlaying({ sessions, totalBandwidthKbps }) {
   const body = document.getElementById('now-playing-body');
   const headline = document.getElementById('hero-headline');
   const indicator = document.getElementById('live-indicator');
 
   store.nowPlaying = sessions;
+  const bandwidth = totalBandwidthKbps ? ` · ${(totalBandwidthKbps / 1000).toFixed(1)} Mbps` : '';
   headline.textContent = sessions.length
-    ? `${sessions.length} stream${sessions.length === 1 ? '' : 's'} live right now`
+    ? `${sessions.length} stream${sessions.length === 1 ? '' : 's'} live right now${bandwidth}`
     : 'Nothing playing right now';
   indicator.style.visibility = sessions.length ? 'visible' : 'hidden';
   body.innerHTML = !sessions.length

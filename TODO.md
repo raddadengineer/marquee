@@ -1,7 +1,9 @@
 # Roadmap
 
 ## Shipped
-- [x] Now Playing — live push updates via Plex WebSocket + SSE
+- [x] Now Playing — live push updates via Plex WebSocket + SSE, header
+      shows total bandwidth alongside the stream count (Tautulli's own
+      aggregate, not a manual per-session sum)
 - [x] Recently Watched panel (Tautulli history)
 - [x] Recently Added panel — split by Movies/TV/Anime, season-pack drops
       collapsed into one entry instead of one per episode, falls back to the
