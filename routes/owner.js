@@ -81,4 +81,52 @@ router.get('/wanted', requireAuth, requireOwner, async (req, res) => {
   res.json(combined);
 });
 
+// Radarr and Sonarr both report every mount point their own container sees —
+// confirmed live that this setup has them sharing several (/, /config,
+// /downloads/completed all report identical byte counts from both services,
+// since they're the same underlying host volumes). Grouped by matching
+// (total, free) byte pairs rather than by path string, so the dashboard
+// shows one row per actual physical volume instead of the same disk 2-3
+// times under different mount names.
+router.get('/diskspace', requireAuth, requireOwner, async (req, res) => {
+  const [radarr, sonarr] = await Promise.all([
+    settle('radarr diskspace', axios.get(`${process.env.RADARR_URL}/api/v3/diskspace`, {
+      headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
+    }).then(r => r.data), []),
+    settle('sonarr diskspace', axios.get(`${process.env.SONARR_URL}/api/v3/diskspace`, {
+      headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+    }).then(r => r.data), [])
+  ]);
+
+  const groups = new Map();
+  for (const d of [...radarr, ...sonarr]) {
+    // Grouped by total capacity alone, not (total, free) — confirmed live
+    // that free space drifts by a few hundred KB between the Radarr and
+    // Sonarr calls (made moments apart), so requiring an exact free-byte
+    // match too was splitting the same physical volume into two rows.
+    // Total capacity doesn't fluctuate, and two genuinely different volumes
+    // having byte-for-byte identical total capacity is effectively never
+    // going to happen in practice.
+    const key = d.totalSpace;
+    const existing = groups.get(key);
+    // Prefer the shortest path as the representative label for a group ("/"
+    // over "/config" over "/downloads/completed") — reads as the more
+    // meaningful description of the same volume.
+    if (!existing || d.path.length < existing.path.length) {
+      groups.set(key, d);
+    }
+  }
+
+  const results = [...groups.values()]
+    .map(d => ({
+      path: d.label || d.path,
+      freeBytes: d.freeSpace,
+      totalBytes: d.totalSpace,
+      usedPercent: d.totalSpace ? Math.round((1 - d.freeSpace / d.totalSpace) * 100) : 0
+    }))
+    .sort((a, b) => a.freeBytes - b.freeBytes);
+
+  res.json(results);
+});
+
 module.exports = router;

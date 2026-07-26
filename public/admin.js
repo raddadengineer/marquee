@@ -20,6 +20,8 @@
   setInterval(loadPendingRequests, 30000);
   loadAdminIssues();
   setInterval(loadAdminIssues, 30000);
+  loadDiskSpace();
+  setInterval(loadDiskSpace, 60000);
   loadDownloadIssues();
   setInterval(loadDownloadIssues, 15000);
   loadWanted();
@@ -253,6 +255,32 @@ async function openReleaseModal(ctx) {
 document.getElementById('close-release-modal-btn').addEventListener('click', () => {
   document.getElementById('release-modal').classList.add('hidden');
 });
+
+// ---------- Stack: Disk Space ----------
+// One row per actual physical volume (Radarr/Sonarr both report every mount
+// point they see, deduped server-side) — reuses the same .bar/.bar-fill
+// component already used for UPS battery charge and download progress.
+async function loadDiskSpace() {
+  const body = document.getElementById('diskspace-body');
+  try {
+    const disks = await api('/api/owner/diskspace');
+    if (!disks.length) { body.innerHTML = '<p class="empty-state">No disk info available.</p>'; return; }
+    body.innerHTML = disks.map(d => `
+      <div class="dl-row">
+        <div class="dl-row-body">
+          <div class="now-title">${escapeHtml(d.path)}</div>
+          <div class="now-meta">
+            <span class="state-dot ${d.usedPercent >= 90 ? 'danger' : ''}"></span>
+            ${formatBytes(d.freeBytes)} free of ${formatBytes(d.totalBytes)} · ${d.usedPercent}% used
+          </div>
+          <div class="bar"><div class="bar-fill" style="width:${d.usedPercent}%"></div></div>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    body.innerHTML = '<p class="empty-state">Could not load disk space.</p>';
+  }
+}
 
 // ---------- Stack: Download Issues ----------
 // Not actively downloading and not seeding/complete — i.e. actually stuck or

@@ -36,7 +36,11 @@ function formatEta(seconds) {
 }
 function formatBytes(bytes) {
   if (!bytes) return '';
-  return (bytes / (1024 ** 3)).toFixed(1) + ' GB';
+  const gb = bytes / (1024 ** 3);
+  // Release/download sizes never got big enough for this to matter before —
+  // whole-volume disk space (admin Stack panel) is the first place values
+  // routinely cross into TB.
+  return gb >= 1000 ? (gb / 1024).toFixed(1) + ' TB' : gb.toFixed(1) + ' GB';
 }
 function titleCase(str) {
   return str.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
