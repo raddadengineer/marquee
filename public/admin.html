@@ -48,6 +48,9 @@
 
     <section class="card span4" id="panel-stack">
       <div class="card-label"><span class="chan">CH.10</span> Stack</div>
+      <h4 class="admin-subhead">Search Library</h4>
+      <input id="library-search-input" type="text" placeholder="Search your Radarr/Sonarr library…" autocomplete="off">
+      <div id="library-search-body"><p class="empty-state">Type to search.</p></div>
       <h4 class="admin-subhead">Disk Space</h4>
       <div id="diskspace-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Download Issues</h4>
@@ -71,6 +74,50 @@
       <button id="close-release-modal-btn" class="pill-btn pill-btn-icon">&#10005;</button>
     </div>
     <div id="release-list" class="release-list"><p class="empty-state">Loading…</p></div>
+  </div>
+</div>
+
+<!-- CURRENT FILE INFO MODAL (shown before jumping to release search) -->
+<div id="file-info-modal" class="modal hidden">
+  <div class="modal-card info-card">
+    <button id="close-file-info-btn" class="pill-btn pill-btn-icon info-close">&#10005;</button>
+    <div class="info-layout">
+      <img id="file-info-poster" class="info-poster" src="" onerror="this.style.visibility='hidden'">
+      <div class="info-body">
+        <span id="file-info-badge" class="chan"></span>
+        <h3 id="file-info-title"></h3>
+        <p id="file-info-subtitle" class="info-meta"></p>
+        <p id="file-info-details" class="info-overview"></p>
+        <div class="pending-actions">
+          <button id="file-info-search-btn" class="search-release-btn pill-btn">
+            <span class="state-dot"></span><span class="btn-label">Search for release</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MANUAL IMPORT MODAL -->
+<div id="manual-import-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="manual-import-title">Manual import</h3>
+      <button id="close-manual-import-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+    <div id="manual-import-list" class="release-list"><p class="empty-state">Loading…</p></div>
+  </div>
+</div>
+
+<!-- LIBRARY SEARCH: TV SEASON/EPISODE BROWSE (release search is per-episode) -->
+<div id="library-browse-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="library-browse-title">Choose a season</h3>
+      <button id="close-library-browse-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+    <button id="library-browse-back" class="pill-btn hidden"><span class="state-dot paused"></span>&#8592; Back to seasons</button>
+    <div id="library-browse-list" class="season-list"></div>
   </div>
 </div>
 

@@ -32,8 +32,19 @@
       issues), Import Issues (stuck/failed Radarr/Sonarr queue items, with
       Remove), Prowlarr indexer health, Disk space (Radarr/Sonarr diskspace
       API, deduped to actual physical volumes)
-
-## Ideas
-- [ ] Kid-safe mode
-- [ ] Plex Watchlist integration
-- [ ] Audiobookshelf/Mylar3 integration
+- [x] Plex Watchlist tab in the request modal — each family member's own
+      Watchlist, cross-referenced against Overseerr for availability, one-tap
+      request straight from it (movies direct, TV through the season picker)
+- [x] My Requests status accuracy fix — "Downloading" now means actually
+      present in Radarr/Sonarr's queue, not just "Overseerr handed it off"
+      (previously showed unreleased/no-release-found items as downloading)
+- [x] Admin: Search Library — free-text search across Radarr/Sonarr's own
+      tracked library (not TMDB), TV results drill into season -> episode
+      before searching indexers, since Sonarr only searches per-episode
+- [x] Admin: Force Import for stuck Import Issues — reviews Radarr/Sonarr's
+      manual-import candidate and rejection reason, then pushes the import
+      through; TBA-title TV rejections trigger a Sonarr series refresh and
+      recheck first, since that's often just stale metadata
+- [x] Admin: current file info (quality/resolution/codecs/size/date added)
+      shown before searching for a replacement, from both Search Library and
+      Open Issues — see what you have before deciding to replace it

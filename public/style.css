@@ -342,10 +342,11 @@ body {
 .modal-tab.active .state-dot { background: var(--teal); }
 .modal-tab.active { color: var(--text); border-color: rgba(15,143,118,0.35); background: rgba(15,143,118,0.08); }
 
-/* Both tab panes sit in the same flex-column .modal-card, so each needs to be
+/* All tab panes (plus the season picker, shown in place of whichever tab
+   triggered it) sit in the same flex-column .modal-card, so each needs to be
    a flex column itself (min-height:0 so overflow-y:auto below actually kicks
    in instead of the card just growing past its max-height). */
-#search-tab, #myrequests-tab, #report-search-view, #report-browse-view, #report-form-view {
+#search-tab, #myrequests-tab, #watchlist-tab, #season-picker, #report-search-view, #report-browse-view, #report-form-view {
   flex: 1; min-height: 0; display: flex; flex-direction: column;
 }
 
@@ -359,7 +360,7 @@ body {
 .browse-row-name { font-size: 0.85rem; font-weight: 600; }
 .browse-row-index { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); }
 
-#search-input, #report-search-input {
+#search-input, #report-search-input, #library-search-input {
   width: 100%; padding: 0.75rem 0.95rem; background: rgba(255,255,255,0.7);
   border: 1px solid rgba(20,25,35,0.1); border-radius: 9px; color: var(--text);
   font-family: var(--body); font-size: 0.9rem; margin-bottom: 0.85rem;
@@ -460,9 +461,10 @@ body {
 .pending-requester { display: flex; align-items: center; gap: 0.35rem; margin-top: 3px; font-size: 0.74rem; color: var(--muted); font-family: var(--mono); }
 .pending-requester img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; background: #E2E6EC; }
 .pending-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
-/* Only Wanted/Missing rows open a details view on click — the other
-   .pending-row uses (pending requests, open issues, import issues) don't. */
-#wanted-body .pending-row { cursor: pointer; }
+/* Wanted/Missing, Search Library, and Open Issues rows act on click anywhere
+   in the row — pending requests and import issues only act on their explicit
+   buttons. */
+#wanted-body .pending-row, #library-search-body .pending-row, #admin-issues-body .pending-row { cursor: pointer; }
 
 /* "Request" — shown on the info modal when opened from a search/discover
    result (not yet in the library), so a title/poster click leads to details

@@ -408,30 +408,43 @@ document.getElementById('close-modal-btn').addEventListener('click', () => {
 });
 
 // ---------- Request modal tabs ----------
-const tabSearchBtn = document.getElementById('tab-search-btn');
-const tabMyRequestsBtn = document.getElementById('tab-myrequests-btn');
-const searchTab = document.getElementById('search-tab');
-const myRequestsTab = document.getElementById('myrequests-tab');
+// Each tab is a { btn, pane } pair; activateTab flips every pane/button at once
+// so adding a new tab is just one more entry here rather than more pairwise
+// on/off toggling.
+const modalTabs = [
+  { btn: document.getElementById('tab-search-btn'), pane: document.getElementById('search-tab') },
+  { btn: document.getElementById('tab-myrequests-btn'), pane: document.getElementById('myrequests-tab') },
+  { btn: document.getElementById('tab-watchlist-btn'), pane: document.getElementById('watchlist-tab') }
+];
+function activateTab(btn) {
+  for (const t of modalTabs) {
+    const isActive = t.btn === btn;
+    t.btn.classList.toggle('active', isActive);
+    t.pane.classList.toggle('hidden', !isActive);
+  }
+}
+
 let myRequestsLoaded = false;
+let watchlistLoaded = false;
 
-tabSearchBtn.addEventListener('click', () => {
-  tabSearchBtn.classList.add('active');
-  tabMyRequestsBtn.classList.remove('active');
-  searchTab.classList.remove('hidden');
-  myRequestsTab.classList.add('hidden');
-});
+modalTabs[0].btn.addEventListener('click', () => activateTab(modalTabs[0].btn));
 
-tabMyRequestsBtn.addEventListener('click', () => {
-  tabMyRequestsBtn.classList.add('active');
-  tabSearchBtn.classList.remove('active');
-  myRequestsTab.classList.remove('hidden');
-  searchTab.classList.add('hidden');
+modalTabs[1].btn.addEventListener('click', () => {
+  activateTab(modalTabs[1].btn);
   // Lazy-loaded on first visit to the tab, then left cached for the rest of
   // this modal session — requests don't change status fast enough to need
   // refetching every time the tab is reopened within the same visit.
   if (!myRequestsLoaded) {
     myRequestsLoaded = true;
     loadMyRequests();
+  }
+});
+
+modalTabs[2].btn.addEventListener('click', () => {
+  activateTab(modalTabs[2].btn);
+  if (!watchlistLoaded) {
+    watchlistLoaded = true;
+    loadWatchlist();
   }
 });
 
@@ -443,7 +456,7 @@ async function loadMyRequests() {
       listEl.innerHTML = '<p class="empty-state">No requests yet.</p>';
       return;
     }
-    const statusText = { available: 'Available', downloading: 'Downloading', pending: 'Pending Approval', declined: 'Declined' };
+    const statusText = { available: 'Available', downloading: 'Downloading', approved: 'Approved', pending: 'Pending Approval', declined: 'Declined' };
     listEl.innerHTML = results.map(r => `
       <div class="my-request-row">
         <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
@@ -460,14 +473,15 @@ async function loadMyRequests() {
   }
 }
 
-// Shared by the discover feed and actual search results — same item shape
-// from the backend (routes/overseerr.js's mapDiscoverItem), same row markup.
-// Keeps the last-rendered array around so a row click can look itself up by
-// index and open the info modal with full details before requesting.
-let currentSearchResults = [];
-function renderSearchResults(results, emptyMessage) {
-  currentSearchResults = results;
-  const resultsEl = document.getElementById('search-results');
+// Shared by the discover feed, actual search results, and the watchlist tab —
+// same item shape from the backend (lib/overseerrClient.js's mapDiscoverItem),
+// same row markup. Keeps the last-rendered array around per container so a row
+// click can look itself up by index and open the info modal with full details
+// before requesting.
+const resultsStore = {};
+function renderSearchResults(results, emptyMessage, containerId = 'search-results') {
+  resultsStore[containerId] = results;
+  const resultsEl = document.getElementById(containerId);
   if (!results.length) { resultsEl.innerHTML = `<p class="empty-state">${emptyMessage}</p>`; return; }
   resultsEl.innerHTML = results.map((r, idx) => `
     <div class="result-item" data-idx="${idx}">
@@ -501,6 +515,20 @@ async function loadDiscover() {
   }
 }
 
+// The family member's own Plex Watchlist, cross-referenced against Overseerr
+// server-side (routes/watchlist.js) so it renders with the exact same row
+// markup + request flow as search/discover.
+async function loadWatchlist() {
+  const listEl = document.getElementById('watchlist-list');
+  listEl.innerHTML = '<p class="empty-state">Loading…</p>';
+  try {
+    const results = await api('/api/watchlist');
+    renderSearchResults(results, "Nothing on your Plex Watchlist yet.", 'watchlist-list');
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-state">Could not load your watchlist.</p>';
+  }
+}
+
 let searchTimer;
 document.getElementById('search-input').addEventListener('input', e => {
   clearTimeout(searchTimer);
@@ -517,7 +545,10 @@ document.getElementById('search-input').addEventListener('input', e => {
   }, 400);
 });
 
-document.getElementById('search-results').addEventListener('click', async e => {
+// Shared by the search-results and watchlist-list containers — same row
+// markup, same request flow, just a different source list and (for the
+// season picker) a different tab to return to when it closes.
+async function handleResultsClick(e, containerId, tabId) {
   const btn = e.target.closest('.request-btn');
   if (btn && !btn.disabled) {
     const id = Number(btn.dataset.id);
@@ -526,7 +557,7 @@ document.getElementById('search-results').addEventListener('click', async e => {
     // TV shows go through the season picker instead of requesting the whole
     // series outright — movies have no seasons, so those still request directly.
     if (mediaType === 'tv') {
-      openSeasonPicker(id, btn.dataset.title, btn);
+      openSeasonPicker(id, btn.dataset.title, btn, tabId);
       return;
     }
     btn.disabled = true;
@@ -548,7 +579,7 @@ document.getElementById('search-results').addEventListener('click', async e => {
   // button) — show details before committing to a request.
   const item = e.target.closest('.result-item');
   if (!item) return;
-  const r = currentSearchResults[Number(item.dataset.idx)];
+  const r = resultsStore[containerId]?.[Number(item.dataset.idx)];
   if (!r) return;
   openInfo({
     poster: r.poster, title: r.title,
@@ -557,22 +588,25 @@ document.getElementById('search-results').addEventListener('click', async e => {
     overview: r.overview,
     request: r
   });
-});
+}
+document.getElementById('search-results').addEventListener('click', e => handleResultsClick(e, 'search-results', 'search-tab'));
+document.getElementById('watchlist-list').addEventListener('click', e => handleResultsClick(e, 'watchlist-list', 'watchlist-tab'));
 
 // ---------- Season picker ----------
-let seasonPickerContext = null; // { id, button }
+// Shown in place of whichever tab (Search or Watchlist) triggered it — returnTabId
+// remembers which one to bring back when the picker closes.
+let seasonPickerContext = null; // { id, button, returnTabId }
 
-async function openSeasonPicker(id, title, button) {
+async function openSeasonPicker(id, title, button, returnTabId) {
   const listEl = document.getElementById('season-picker-list');
   const submitBtn = document.getElementById('season-picker-submit');
 
-  seasonPickerContext = { id, button };
+  seasonPickerContext = { id, button, returnTabId };
   document.getElementById('season-picker-title').textContent = title;
   listEl.innerHTML = '<p class="empty-state">Loading seasons…</p>';
   submitBtn.disabled = false;
   submitBtn.textContent = 'Request Selected Seasons';
-  document.getElementById('search-results').classList.add('hidden');
-  document.getElementById('search-input').classList.add('hidden');
+  document.getElementById(returnTabId).classList.add('hidden');
   document.getElementById('season-picker').classList.remove('hidden');
 
   try {
@@ -603,8 +637,9 @@ async function openSeasonPicker(id, title, button) {
 
 function closeSeasonPicker() {
   document.getElementById('season-picker').classList.add('hidden');
-  document.getElementById('search-results').classList.remove('hidden');
-  document.getElementById('search-input').classList.remove('hidden');
+  if (seasonPickerContext) {
+    document.getElementById(seasonPickerContext.returnTabId).classList.remove('hidden');
+  }
   seasonPickerContext = null;
 }
 

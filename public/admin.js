@@ -148,7 +148,7 @@ async function loadAdminIssues() {
     body.innerHTML = results.map(r => `
       <div class="pending-row" data-id="${r.id}" data-title="${escapeHtml(r.title || 'Unknown title')}"
            data-media-type="${r.mediaType || ''}" data-tmdb-id="${r.tmdbId || ''}" data-tvdb-id="${r.tvdbId || ''}"
-           data-season="${r.season || ''}" data-episode="${r.episode || ''}">
+           data-season="${r.season || ''}" data-episode="${r.episode || ''}" data-poster="${r.poster || ''}">
         <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div class="result-title">${escapeHtml(r.title || 'Unknown title')}${r.season ? ` — S${r.season}E${r.episode}` : ''}</div>
@@ -169,28 +169,62 @@ async function loadAdminIssues() {
   }
 }
 
+// Same "Search button jumps straight to release search, tapping anywhere else
+// on the row shows current-file details first" pattern as Wanted/Missing.
 document.getElementById('admin-issues-body').addEventListener('click', async e => {
   const searchBtn = e.target.closest('.search-release-btn');
   if (searchBtn) {
     openReleaseModal(searchBtn.closest('.pending-row').dataset);
     return;
   }
-  const btn = e.target.closest('.approve-btn');
-  if (!btn) return;
-  const row = btn.closest('.pending-row');
-  row.querySelectorAll('button').forEach(b => b.disabled = true);
-  btn.querySelector('.btn-label').textContent = '…';
-  try {
-    await api(`/api/overseerr/issues/${row.dataset.id}/resolve`, { method: 'POST' });
-    row.remove();
-    if (!document.getElementById('admin-issues-body').children.length) {
-      document.getElementById('admin-issues-body').innerHTML = '<p class="empty-state">Nothing open.</p>';
+
+  const approveBtn = e.target.closest('.approve-btn');
+  if (approveBtn) {
+    const row = approveBtn.closest('.pending-row');
+    row.querySelectorAll('button').forEach(b => b.disabled = true);
+    approveBtn.querySelector('.btn-label').textContent = '…';
+    try {
+      await api(`/api/overseerr/issues/${row.dataset.id}/resolve`, { method: 'POST' });
+      row.remove();
+      if (!document.getElementById('admin-issues-body').children.length) {
+        document.getElementById('admin-issues-body').innerHTML = '<p class="empty-state">Nothing open.</p>';
+      }
+    } catch (err) {
+      row.querySelectorAll('button').forEach(b => b.disabled = false);
+      approveBtn.querySelector('.btn-label').textContent = 'Resolve';
     }
-  } catch (e) {
-    row.querySelectorAll('button').forEach(b => b.disabled = false);
-    btn.querySelector('.btn-label').textContent = 'Resolve';
+    return;
   }
+
+  const row = e.target.closest('.pending-row');
+  if (!row) return;
+  openIssueFileInfo(row.dataset);
 });
+
+// Looks up what's currently on disk for a reported item, so the owner sees
+// the actual file (quality/size/codec) before deciding to search for a
+// replacement — rather than searching blind from just the issue report.
+async function openIssueFileInfo(ctx) {
+  const isMovie = ctx.mediaType === 'movie';
+  openFileInfoModal({
+    badge: isMovie ? 'MOVIE' : 'TV',
+    title: ctx.title,
+    subtitle: ctx.season ? `S${ctx.season}E${ctx.episode}` : '',
+    poster: ctx.poster,
+    file: undefined, // triggers the "Loading…" state below
+    onSearch: () => openReleaseModal(ctx)
+  });
+  try {
+    const url = isMovie
+      ? `/api/radarr/file-info?tmdbId=${ctx.tmdbId}`
+      : `/api/sonarr/file-info?tvdbId=${ctx.tvdbId}&season=${ctx.season}&episode=${ctx.episode}`;
+    const info = await api(url);
+    document.getElementById('file-info-details').textContent = formatFileDetails(info.file);
+    if (info.poster) document.getElementById('file-info-poster').src = info.poster;
+  } catch (e) {
+    document.getElementById('file-info-details').textContent = 'Could not load file info.';
+  }
+}
 
 // ---------- Release search modal ----------
 // Interactive search against Radarr/Sonarr's own configured indexers, so a
@@ -254,6 +288,172 @@ async function openReleaseModal(ctx) {
 
 document.getElementById('close-release-modal-btn').addEventListener('click', () => {
   document.getElementById('release-modal').classList.add('hidden');
+});
+
+// ---------- Stack: Search Library ----------
+// Owner-only free-text search across Radarr/Sonarr's own tracked library (not
+// TMDB/Overseerr) — lets you jump straight to an indexer search for anything
+// already being managed, not just what Wanted/Missing happens to flag (e.g.
+// re-grabbing a bad rip, or something Radarr/Sonarr hasn't realized is
+// missing yet). Movie results go straight to the existing release-search
+// modal; TV results need a season/episode picked first, since Sonarr only
+// searches per-episode.
+let librarySearchResults = [];
+let librarySearchTimer;
+
+document.getElementById('library-search-input').addEventListener('input', e => {
+  clearTimeout(librarySearchTimer);
+  const q = e.target.value.trim();
+  const body = document.getElementById('library-search-body');
+  if (!q) { body.innerHTML = '<p class="empty-state">Type to search.</p>'; return; }
+  librarySearchTimer = setTimeout(async () => {
+    body.innerHTML = '<p class="empty-state">Searching…</p>';
+    try {
+      const [movies, series] = await Promise.all([
+        api(`/api/radarr/search?q=${encodeURIComponent(q)}`),
+        api(`/api/sonarr/search?q=${encodeURIComponent(q)}`)
+      ]);
+      librarySearchResults = [...movies, ...series];
+      if (!librarySearchResults.length) { body.innerHTML = '<p class="empty-state">No matches in your library.</p>'; return; }
+      body.innerHTML = librarySearchResults.map((r, idx) => `
+        <div class="pending-row" data-idx="${idx}">
+          <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+          <div class="result-info">
+            <div class="result-title">${escapeHtml(r.title)}${r.year ? ` (${r.year})` : ''}</div>
+            <div class="pending-requester">${r.mediaType === 'tv' ? 'Series' : 'Movie'}</div>
+          </div>
+          <div class="pending-actions">
+            <button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      body.innerHTML = '<p class="empty-state">Search failed.</p>';
+    }
+  }, 400);
+});
+
+// Tapping anywhere on the row acts (not just the Search button) — movies show
+// their current file info first, TV shows drill into season -> episode first
+// (also landing on the same file-info step) since Sonarr only searches per-episode.
+document.getElementById('library-search-body').addEventListener('click', e => {
+  const row = e.target.closest('.pending-row');
+  if (!row) return;
+  const item = librarySearchResults[Number(row.dataset.idx)];
+  if (!item) return;
+  if (item.mediaType === 'movie') {
+    openFileInfoModal({
+      badge: 'MOVIE',
+      title: item.title,
+      subtitle: item.year ? String(item.year) : '',
+      poster: item.poster,
+      file: item.file,
+      onSearch: () => openReleaseModal(item)
+    });
+  } else {
+    openLibraryBrowseSeasons(item);
+  }
+});
+
+// Remembers which series/season is currently being browsed, so the episode
+// list and the "Back to seasons" button know what to reload.
+let libraryBrowseContext = null; // { seriesId, tvdbId, title, poster, seasons }
+let libraryBrowseEpisodes = [];
+
+function openLibraryBrowseSeasons(series) {
+  libraryBrowseContext = { seriesId: series.seriesId, tvdbId: series.tvdbId, title: series.title, poster: series.poster, seasons: series.seasons };
+  document.getElementById('library-browse-title').textContent = series.title;
+  document.getElementById('library-browse-back').classList.add('hidden');
+  const listEl = document.getElementById('library-browse-list');
+  listEl.innerHTML = series.seasons.length ? series.seasons.map(se => `
+    <div class="browse-row" data-season="${se.seasonNumber}">
+      <div class="browse-row-name">Season ${se.seasonNumber}</div>
+      <div class="browse-row-index">${se.episodeCount} ep</div>
+    </div>
+  `).join('') : '<p class="empty-state">No seasons found.</p>';
+  document.getElementById('library-browse-modal').classList.remove('hidden');
+}
+
+async function openLibraryBrowseEpisodes(season) {
+  libraryBrowseContext.season = season;
+  document.getElementById('library-browse-title').textContent = `${libraryBrowseContext.title} — Season ${season}`;
+  document.getElementById('library-browse-back').classList.remove('hidden');
+  const listEl = document.getElementById('library-browse-list');
+  listEl.innerHTML = '<p class="empty-state">Loading…</p>';
+  try {
+    libraryBrowseEpisodes = await api(`/api/sonarr/episodes?seriesId=${libraryBrowseContext.seriesId}&season=${season}`);
+    listEl.innerHTML = libraryBrowseEpisodes.length ? libraryBrowseEpisodes.map(ep => `
+      <div class="browse-row" data-episode="${ep.episodeNumber}">
+        <div class="browse-row-name">${ep.episodeNumber}. ${escapeHtml(ep.title || 'TBA')}</div>
+        ${ep.hasFile ? '<div class="browse-row-index">Have file</div>' : ''}
+      </div>
+    `).join('') : '<p class="empty-state">No episodes found.</p>';
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-state">Could not load episodes.</p>';
+  }
+}
+
+document.getElementById('library-browse-list').addEventListener('click', e => {
+  const seasonRow = e.target.closest('[data-season]');
+  if (seasonRow) { openLibraryBrowseEpisodes(Number(seasonRow.dataset.season)); return; }
+
+  const epRow = e.target.closest('[data-episode]');
+  if (!epRow) return;
+  const episodeNumber = Number(epRow.dataset.episode);
+  const ep = libraryBrowseEpisodes.find(x => x.episodeNumber === episodeNumber);
+  document.getElementById('library-browse-modal').classList.add('hidden');
+  openFileInfoModal({
+    badge: 'TV',
+    title: libraryBrowseContext.title,
+    subtitle: `S${libraryBrowseContext.season}E${episodeNumber}${ep?.title ? ' — ' + ep.title : ''}`,
+    poster: libraryBrowseContext.poster,
+    file: ep?.file || null,
+    onSearch: () => openReleaseModal({
+      mediaType: 'tv',
+      tvdbId: libraryBrowseContext.tvdbId,
+      season: libraryBrowseContext.season,
+      episode: episodeNumber,
+      title: libraryBrowseContext.title
+    })
+  });
+});
+
+// ---------- Current file info (shown before jumping to release search) ----------
+function formatFileDetails(file) {
+  return file
+    ? [file.quality, file.resolution, file.videoCodec, file.audioCodec, formatBytes(file.size), file.releaseGroup]
+        .filter(Boolean).join(' · ') + (file.dateAdded ? ` · added ${formatDate(file.dateAdded)}` : '')
+    : 'No file on disk yet.';
+}
+
+// `file` is undefined when the caller doesn't have the answer yet (Open
+// Issues fetches it after opening) — distinct from null, which means the
+// server already confirmed there's no file.
+function openFileInfoModal({ badge, title, subtitle, poster, file, onSearch }) {
+  document.getElementById('file-info-badge').textContent = badge;
+  document.getElementById('file-info-title').textContent = title || '';
+  document.getElementById('file-info-subtitle').textContent = subtitle || '';
+  const posterEl = document.getElementById('file-info-poster');
+  posterEl.style.visibility = '';
+  posterEl.src = poster || '';
+  document.getElementById('file-info-details').textContent = file === undefined ? 'Loading…' : formatFileDetails(file);
+  document.getElementById('file-info-search-btn').onclick = () => {
+    document.getElementById('file-info-modal').classList.add('hidden');
+    onSearch();
+  };
+  document.getElementById('file-info-modal').classList.remove('hidden');
+}
+
+document.getElementById('close-file-info-btn').addEventListener('click', () => {
+  document.getElementById('file-info-modal').classList.add('hidden');
+});
+
+document.getElementById('library-browse-back').addEventListener('click', () => {
+  openLibraryBrowseSeasons(libraryBrowseContext);
+});
+
+document.getElementById('close-library-browse-btn').addEventListener('click', () => {
+  document.getElementById('library-browse-modal').classList.add('hidden');
 });
 
 // ---------- Stack: Disk Space ----------
@@ -430,13 +630,14 @@ async function loadImportIssues() {
     const results = [...radarrItems, ...sonarrItems];
     if (!results.length) { body.innerHTML = '<p class="empty-state">No import issues.</p>'; return; }
     body.innerHTML = results.map(r => `
-      <div class="pending-row" data-id="${r.id}" data-service="${r.service}">
+      <div class="pending-row" data-id="${r.id}" data-service="${r.service}" data-download-id="${r.downloadId || ''}" data-title="${escapeHtml(r.title || 'Unknown title')}">
         <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
           <div class="issue-message">${escapeHtml(r.reason)}</div>
         </div>
         <div class="pending-actions">
+          ${r.downloadId ? '<button class="force-import-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Force Import</span></button>' : ''}
           <button class="remove-queue-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Remove</span></button>
         </div>
       </div>
@@ -447,6 +648,13 @@ async function loadImportIssues() {
 }
 
 document.getElementById('import-issues-body').addEventListener('click', async e => {
+  const importBtn = e.target.closest('.force-import-btn');
+  if (importBtn) {
+    const row = importBtn.closest('.pending-row');
+    openManualImportModal(row.dataset.service, row.dataset.downloadId, row.dataset.title);
+    return;
+  }
+
   const btn = e.target.closest('.remove-queue-btn');
   if (!btn) return;
   if (!confirm('Remove this from the queue and blocklist the release?')) return;
@@ -463,6 +671,72 @@ document.getElementById('import-issues-body').addEventListener('click', async e 
     row.querySelectorAll('button').forEach(b => b.disabled = false);
     btn.querySelector('.btn-label').textContent = 'Remove';
   }
+});
+
+// ---------- Manual import ----------
+// Shows what Radarr/Sonarr actually found in the download's folder — its best
+// guess at which movie/episode it belongs to, and why it refused to import
+// automatically (rejections) — so forcing it through is an informed choice,
+// not a blind override. "Force Import" resubmits exactly the match Radarr/
+// Sonarr already suggested; this isn't a "pick a different movie" tool.
+let manualImportCandidates = [];
+async function openManualImportModal(service, downloadId, title) {
+  const modal = document.getElementById('manual-import-modal');
+  const listEl = document.getElementById('manual-import-list');
+  document.getElementById('manual-import-title').textContent = title;
+  listEl.innerHTML = '<p class="empty-state">Loading… (if a TV episode title is still TBA, this refreshes the series first — can take up to 20s)</p>';
+  modal.classList.remove('hidden');
+
+  try {
+    manualImportCandidates = await api(`/api/${service}/manual-import?downloadId=${encodeURIComponent(downloadId)}`);
+    if (!manualImportCandidates.length) { listEl.innerHTML = '<p class="empty-state">No files found.</p>'; return; }
+    listEl.innerHTML = manualImportCandidates.map((c, idx) => {
+      const matched = service === 'radarr' ? c.movieTitle : (c.seriesTitle ? `${c.seriesTitle} — ${c.episodeLabel}` : null);
+      return `
+        <div class="release-row ${c.rejections.length ? 'rejected' : ''}">
+          <div class="release-info">
+            <div class="release-title" title="${escapeHtml(c.name || c.path)}">${escapeHtml(c.name || c.path)}</div>
+            <div class="release-meta">
+              ${matched ? `Matched: ${escapeHtml(matched)}` : 'No match found'}
+              ${c.quality?.quality?.name ? ' · ' + escapeHtml(c.quality.quality.name) : ''}
+            </div>
+            ${c.rejections.length ? `<div class="release-rejections">${escapeHtml(c.rejections.join(', '))}</div>` : ''}
+          </div>
+          ${matched ? `
+            <button class="force-import-confirm-btn pill-btn" data-idx="${idx}">
+              <span class="state-dot"></span><span class="btn-label">Force Import</span>
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = `<p class="empty-state">${escapeHtml(e.message || 'Could not look up import candidates.')}</p>`;
+  }
+
+  listEl.onclick = async e => {
+    const btn = e.target.closest('.force-import-confirm-btn');
+    if (!btn) return;
+    const c = manualImportCandidates[Number(btn.dataset.idx)];
+    if (!c) return;
+    btn.disabled = true;
+    btn.querySelector('.btn-label').textContent = 'Importing…';
+    try {
+      const payload = service === 'radarr'
+        ? { path: c.path, folderName: c.folderName, movieId: c.movieId, quality: c.quality, languages: c.languages, releaseGroup: c.releaseGroup, indexerFlags: c.indexerFlags, downloadId: c.downloadId }
+        : { path: c.path, folderName: c.folderName, seriesId: c.seriesId, episodeIds: c.episodeIds, quality: c.quality, languages: c.languages, releaseGroup: c.releaseGroup, indexerFlags: c.indexerFlags, downloadId: c.downloadId };
+      await api(`/api/${service}/manual-import`, { method: 'POST', body: JSON.stringify(payload) });
+      btn.querySelector('.btn-label').textContent = 'Importing ✓';
+      loadImportIssues(); // the queue row should clear once the import lands
+    } catch (err) {
+      btn.disabled = false;
+      btn.querySelector('.btn-label').textContent = 'Force Import';
+    }
+  };
+}
+
+document.getElementById('close-manual-import-btn').addEventListener('click', () => {
+  document.getElementById('manual-import-modal').classList.add('hidden');
 });
 
 // ---------- Stack: Indexers ----------

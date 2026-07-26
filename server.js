@@ -53,6 +53,7 @@ app.use('/api/tautulli', require('./routes/tautulli'));
 app.use('/api/sonarr', require('./routes/sonarr'));
 app.use('/api/radarr', require('./routes/radarr'));
 app.use('/api/overseerr', require('./routes/overseerr'));
+app.use('/api/watchlist', require('./routes/watchlist'));
 app.use('/api/downloads', require('./routes/downloads'));
 app.use('/api/owner', require('./routes/owner'));
 app.use('/api/prowlarr', require('./routes/prowlarr'));

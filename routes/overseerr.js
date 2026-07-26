@@ -6,6 +6,8 @@ const overseerrSession = require('../lib/overseerrSession');
 const rateLimit = require('../lib/rateLimit');
 const sse = require('../lib/sse');
 const tautulliMedia = require('../lib/tautulliMedia');
+const { adminClient, mapDiscoverItem } = require('../lib/overseerrClient');
+const downloadQueueIds = require('../lib/downloadQueueIds');
 const router = express.Router();
 
 // Unlike the read-only endpoints below, these have a real side effect (creates an
@@ -13,37 +15,6 @@ const router = express.Router();
 // independent of who's authenticated.
 const requestLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, message: 'Too many requests submitted — try again in a few minutes.' });
 const issueLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, message: 'Too many issues reported — try again in a few minutes.' });
-
-// Search/discovery has no permission-sensitive behavior in Overseerr, so this
-// stays on the simple admin-key client. Request/issue submission does not — see
-// postAsUser below. Built once (not a function re-called per request) — the
-// config never changes, and some call sites construct one of these per item in
-// a Promise.all over a whole request/issue list, so recreating it each time was
-// pure waste.
-const adminClient = axios.create({
-  baseURL: `${process.env.OVERSEERR_URL}/api/v1`,
-  headers: { 'X-Api-Key': process.env.OVERSEERR_API_KEY }
-});
-
-// Shared by /search and /discover below — both return raw Overseerr
-// TMDB-shaped results (movie/tv) needing the same trimming + availability
-// computation.
-function mapDiscoverItem(r) {
-  return {
-    id: r.id,
-    mediaType: r.mediaType,
-    title: r.title || r.name,
-    year: (r.releaseDate || r.firstAirDate || '').slice(0, 4),
-    overview: r.overview,
-    poster: r.posterPath ? `https://image.tmdb.org/t/p/w300${r.posterPath}` : null,
-    // Overseerr media status: 4 = partially available, 5 = available — i.e.
-    // actually already in Plex, distinct from just having been requested
-    // (2 = pending, 3 = processing) or never touched (everything else).
-    availability: [4, 5].includes(r.mediaInfo?.status) ? 'available'
-      : [2, 3].includes(r.mediaInfo?.status) ? 'requested'
-      : 'none'
-  };
-}
 
 router.get('/search', requireAuth, async (req, res) => {
   try {
@@ -187,23 +158,37 @@ async function resolveMedia(mediaType, tmdbId) {
 router.get('/requests/mine', requireAuth, async (req, res) => {
   try {
     const session = await overseerrSession.getSession(req.session.user.id, req.session.user.plexToken);
-    const { data } = await axios.get(`${process.env.OVERSEERR_URL}/api/v1/request`, {
-      params: { take: 20, sort: 'added', requestedBy: session.overseerrUserId },
-      headers: { Cookie: session.cookie }
-    });
+    const [{ data }, queued] = await Promise.all([
+      axios.get(`${process.env.OVERSEERR_URL}/api/v1/request`, {
+        params: { take: 20, sort: 'added', requestedBy: session.overseerrUserId },
+        headers: { Cookie: session.cookie }
+      }),
+      downloadQueueIds.getQueuedIds()
+    ]);
 
     const results = await Promise.all(data.results.map(async r => {
       const mediaType = r.type; // 'movie' | 'tv'
       const { title, poster } = await resolveMedia(mediaType, r.media?.tmdbId);
-      // Two different things worth showing distinctly: whether the request
-      // itself was approved (r.status: 1 pending, 2 approved, 3 declined), and
+      // Four different things worth showing distinctly: whether the request
+      // itself needs approval (r.status: 1 pending, 2 approved, 3 declined),
       // whether the underlying media is actually available yet (r.media.status:
-      // 4/5 = available) — an approved request can still be mid-download.
+      // 4/5 = available), whether it's genuinely sitting in Radarr/Sonarr's
+      // download queue right now, or whether it's just approved with nothing
+      // actually happening yet. That last case matters: Overseerr sets
+      // media.status to PROCESSING the instant a request is approved and handed
+      // off, even for a movie that hasn't been released yet and has no release
+      // to grab — confirmed live (Clayface, releases 2027, empty Radarr queue)
+      // showing as "Downloading" — so PROCESSING alone can't be trusted as
+      // "downloading"; only actual presence in the *arr queue can.
       const mediaStatus = r.media?.status;
+      const inQueue = mediaType === 'movie'
+        ? queued.movieIds.has(r.media?.externalServiceId)
+        : queued.seriesIds.has(r.media?.externalServiceId);
       const availability = r.status === 3 ? 'declined'
         : [4, 5].includes(mediaStatus) ? 'available'
         : r.status === 1 ? 'pending'
-        : 'downloading';
+        : inQueue ? 'downloading'
+        : 'approved';
       return { title, poster, mediaType, availability, requestedAt: r.createdAt };
     }));
 

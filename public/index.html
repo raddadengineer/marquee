@@ -141,23 +141,29 @@
     <div class="modal-tabs">
       <button id="tab-search-btn" class="modal-tab pill-btn active"><span class="state-dot"></span>Search</button>
       <button id="tab-myrequests-btn" class="modal-tab pill-btn"><span class="state-dot"></span>My Requests</button>
+      <button id="tab-watchlist-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Watchlist</button>
     </div>
 
     <div id="search-tab">
       <input id="search-input" type="text" placeholder="Search a movie or show…" autocomplete="off">
       <div id="discover-label" class="discover-label">Trending &amp; new releases — not yet in your library</div>
       <div id="search-results" class="search-results"></div>
-
-      <div id="season-picker" class="season-picker hidden">
-        <button id="season-picker-back" class="pill-btn"><span class="state-dot paused"></span>&#8592; Back to search</button>
-        <h4 id="season-picker-title"></h4>
-        <div id="season-picker-list" class="season-list"></div>
-        <button id="season-picker-submit" class="btn-primary">Request Selected Seasons</button>
-      </div>
     </div>
 
     <div id="myrequests-tab" class="hidden">
       <div id="my-requests-list" class="my-requests-list"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="watchlist-tab" class="hidden">
+      <div id="watchlist-label" class="discover-label">Your Plex Watchlist — tap Request to grab anything you don't have yet</div>
+      <div id="watchlist-list" class="search-results"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="season-picker" class="season-picker hidden">
+      <button id="season-picker-back" class="pill-btn"><span class="state-dot paused"></span>&#8592; Back</button>
+      <h4 id="season-picker-title"></h4>
+      <div id="season-picker-list" class="season-list"></div>
+      <button id="season-picker-submit" class="btn-primary">Request Selected Seasons</button>
     </div>
   </div>
 </div>
