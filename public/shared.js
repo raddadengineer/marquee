@@ -45,3 +45,18 @@ function formatBytes(bytes) {
 function titleCase(str) {
   return str.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
 }
+
+// Clicking a modal's backdrop closes it, sitewide — applies automatically to
+// every ".modal" on the page (both index.html and admin.html), no per-modal
+// wiring needed. Triggers the modal's own close button rather than just
+// toggling .hidden directly, so any extra cleanup a specific modal's close
+// handler does (e.g. resetting the request modal back to its Search tab)
+// still runs the same way it would from clicking the X. e.target === modal
+// only when the click actually landed on the backdrop itself, not on the
+// card or anything inside it.
+document.querySelectorAll('.modal').forEach(modal => {
+  modal.addEventListener('click', e => {
+    if (e.target !== modal) return;
+    modal.querySelector('.pill-btn-icon')?.click();
+  });
+});
