@@ -516,3 +516,43 @@ body {
 .release-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
 .release-rejections { font-size: 0.7rem; color: var(--danger); margin-top: 2px; }
 .grab-btn { flex-shrink: 0; }
+
+/* Settings modal (owner only) — edits .env directly, grouped by the file's
+   own "# ---- Section ----" comments. */
+.settings-card { width: min(620px, 92vw); }
+.settings-body { flex: 1; min-height: 0; overflow-y: auto; margin: 0.5rem 0; }
+.settings-section-label {
+  font-family: var(--mono); font-size: 0.68rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.05em; margin: 1.1rem 0 0.4rem; padding-bottom: 0.3rem; border-bottom: 1px solid rgba(20,25,35,0.08);
+}
+.settings-section-label:first-child { margin-top: 0; }
+.settings-field { display: flex; align-items: center; gap: 0.85rem; padding: 0.55rem 0; }
+.settings-field + .settings-field { border-top: 1px solid rgba(20,25,35,0.06); }
+.settings-field-label { flex: 1; min-width: 0; }
+.settings-field-key { font-family: var(--mono); font-size: 0.78rem; font-weight: 600; display: block; }
+.settings-field-desc { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+.settings-input {
+  width: 45%; min-width: 120px; flex-shrink: 0; padding: 0.45rem 0.6rem; background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(20,25,35,0.1); border-radius: 8px; color: var(--text);
+  font-family: var(--mono); font-size: 0.8rem;
+}
+.settings-input:focus { outline: none; border-color: var(--teal); }
+.settings-input:disabled { opacity: 0.5; cursor: not-allowed; }
+.settings-status { font-size: 0.8rem; text-align: center; margin: 0.5rem 0 0; }
+.settings-status.error { color: var(--danger); }
+.settings-status.ok { color: var(--teal); }
+
+/* Toggle switch for true/false values */
+.settings-toggle { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+.settings-toggle input { opacity: 0; width: 0; height: 0; }
+.settings-toggle-slider {
+  position: absolute; inset: 0; background: rgba(20,25,35,0.15); border-radius: 22px;
+  transition: background 0.15s ease; cursor: pointer;
+}
+.settings-toggle-slider::before {
+  content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: transform 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.settings-toggle input:checked + .settings-toggle-slider { background: var(--teal); }
+.settings-toggle input:checked + .settings-toggle-slider::before { transform: translateX(18px); }
+.settings-toggle input:disabled + .settings-toggle-slider { opacity: 0.5; cursor: not-allowed; }

@@ -792,3 +792,149 @@ async function loadIndexers() {
     body.innerHTML = '<p class="empty-state">Could not load indexers.</p>';
   }
 }
+
+// ---------- Settings ----------
+// Edits .env directly through routes/settings.js. Secrets are never sent to
+// the browser (only whether one is currently set) — leaving a secret field
+// blank means "don't change it," not "clear it." Node only loads env vars
+// once at process start, so any save triggers a real container restart
+// (the save endpoint exits the process; Docker's restart:unless-stopped
+// policy brings it back up with the new values) — this page then polls
+// until the server responds again and reloads itself.
+let settingsFields = [];
+
+document.getElementById('open-settings-btn').addEventListener('click', openSettings);
+
+async function openSettings() {
+  const modal = document.getElementById('settings-modal');
+  const body = document.getElementById('settings-body');
+  const saveBtn = document.getElementById('settings-save-btn');
+  const status = document.getElementById('settings-status');
+  status.className = 'settings-status hidden';
+  status.textContent = '';
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Save & Restart';
+  body.innerHTML = '<p class="empty-state">Loading…</p>';
+  modal.classList.remove('hidden');
+
+  try {
+    settingsFields = await api('/api/settings');
+    renderSettings();
+  } catch (e) {
+    body.innerHTML = `<p class="empty-state">${escapeHtml(e.message || 'Could not load settings.')}</p>`;
+  }
+}
+
+function renderSettings() {
+  const body = document.getElementById('settings-body');
+  let lastSection;
+  body.innerHTML = settingsFields.map(f => {
+    let sectionHtml = '';
+    if (f.section !== lastSection) {
+      lastSection = f.section;
+      sectionHtml = `<div class="settings-section-label">${escapeHtml(f.section || 'Other')}</div>`;
+    }
+    let inputHtml;
+    if (f.readOnly) {
+      inputHtml = `<input class="settings-input" type="text" value="${escapeHtml(f.value || '')}" disabled title="Read-only — changing this could make the app unreachable">`;
+    } else if (f.isBoolean) {
+      inputHtml = `
+        <label class="settings-toggle">
+          <input type="checkbox" data-key="${f.key}" data-type="boolean" ${f.value === 'true' ? 'checked' : ''}>
+          <span class="settings-toggle-slider"></span>
+        </label>
+      `;
+    } else if (f.isSecret) {
+      const placeholder = f.hasValue ? '•••• set — leave blank to keep' : 'Not set';
+      inputHtml = `<input class="settings-input" type="password" data-key="${f.key}" data-type="secret" placeholder="${placeholder}" autocomplete="off">`;
+    } else {
+      inputHtml = `<input class="settings-input" type="text" data-key="${f.key}" data-type="text" value="${escapeHtml(f.value || '')}">`;
+    }
+    return `
+      ${sectionHtml}
+      <div class="settings-field">
+        <div class="settings-field-label">
+          <span class="settings-field-key">${escapeHtml(f.key)}</span>
+          ${f.description ? `<div class="settings-field-desc">${escapeHtml(f.description)}</div>` : ''}
+        </div>
+        ${inputHtml}
+      </div>
+    `;
+  }).join('');
+  body.querySelectorAll('[data-key]').forEach(el => {
+    el.addEventListener('input', updateSettingsSaveState);
+    el.addEventListener('change', updateSettingsSaveState);
+  });
+}
+
+function collectSettingsChanges() {
+  const changes = {};
+  document.querySelectorAll('#settings-body [data-key]').forEach(el => {
+    const key = el.dataset.key;
+    const field = settingsFields.find(f => f.key === key);
+    if (el.dataset.type === 'boolean') {
+      const newValue = el.checked ? 'true' : 'false';
+      if (newValue !== field.value) changes[key] = newValue;
+    } else if (el.dataset.type === 'secret') {
+      if (el.value !== '') changes[key] = el.value;
+    } else if (el.value !== (field.value || '')) {
+      changes[key] = el.value;
+    }
+  });
+  return changes;
+}
+
+function updateSettingsSaveState() {
+  document.getElementById('settings-save-btn').disabled = !Object.keys(collectSettingsChanges()).length;
+}
+
+document.getElementById('close-settings-btn').addEventListener('click', () => {
+  document.getElementById('settings-modal').classList.add('hidden');
+});
+
+document.getElementById('settings-save-btn').addEventListener('click', async () => {
+  const changes = collectSettingsChanges();
+  if (!Object.keys(changes).length) return;
+
+  const changingSessionSecret = Object.prototype.hasOwnProperty.call(changes, 'SESSION_SECRET');
+  const warning = changingSessionSecret
+    ? 'This includes SESSION_SECRET — saving will sign out every family member, including you. The app will restart and this page will reload automatically. Continue?'
+    : 'Save these changes? The app will restart (a few seconds of downtime) and this page will reload automatically.';
+  if (!confirm(warning)) return;
+
+  const saveBtn = document.getElementById('settings-save-btn');
+  const status = document.getElementById('settings-status');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  status.className = 'settings-status';
+  status.textContent = '';
+
+  try {
+    await api('/api/settings', { method: 'POST', body: JSON.stringify({ changes }) });
+    status.className = 'settings-status ok';
+    status.textContent = 'Saved — restarting…';
+    saveBtn.textContent = 'Restarting…';
+    waitForSettingsRestart();
+  } catch (e) {
+    status.className = 'settings-status error';
+    status.textContent = e.message || 'Could not save settings.';
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save & Restart';
+  }
+});
+
+// Polls until the server answers again (any HTTP status — even 401 after a
+// SESSION_SECRET change means it's back up) rather than a fixed delay, which
+// would either reload too early or make the owner wait longer than needed.
+async function waitForSettingsRestart() {
+  await new Promise(r => setTimeout(r, 2000)); // give the process a moment to actually exit first
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.status) { location.reload(); return; }
+    } catch (e) { /* still down — keep polling */ }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  document.getElementById('settings-status').textContent = 'Taking longer than expected — try reloading the page manually.';
+}

@@ -74,6 +74,16 @@
       overall ratio (qBittorrent's real all-time "Global ratio", not the
       session-only figure), plus total uploaded/downloaded — just the
       numbers, no file list
+- [x] Admin: Settings page — edit .env values from the browser instead of a
+      terminal, grouped by the file's own section comments. Secrets (API
+      keys, tokens, passwords) are masked and never sent to the browser;
+      leaving one blank keeps it unchanged. Boolean values get a toggle
+      switch. Infrastructure-critical keys (PORT/HOST_PORT/CONTAINER_NAME)
+      are read-only since changing them can make the app unreachable.
+      Saving triggers a real container restart (Node only loads env vars
+      once, at process start) — the page polls until it's back and reloads
+      itself. Verified live end-to-end: write, restart, session persistence
+      all confirmed against the real deployment
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks

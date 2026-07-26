@@ -12,6 +12,11 @@ services:
       - "${HOST_PORT:-4000}:4000"
     volumes:
       - ./data:/app/data
+      # Read-write so the admin Settings page can edit it directly — Docker
+      # Compose's env_file above only reads this at container start, so any
+      # change here still needs a restart to actually take effect (the
+      # settings save endpoint triggers one itself; see routes/settings.js).
+      - ./.env:/app/.env
       # Optional, for the owner-only status panel: read-only bind mount of Uptime
       # Kuma's data directory, so the app can read kuma.db directly. Set
       # UPTIME_KUMA_DATA_DIR in .env to Kuma's data dir on the host, and
