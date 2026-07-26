@@ -25,6 +25,12 @@
       season -> episode), backed by Overseerr's own issue system
 - [x] Admin: resolve issues + live search/grab a replacement release via
       Radarr/Sonarr's own indexers, without leaving the dashboard
+- [x] Admin moved to its own page (/admin) instead of hidden dashboard
+      panels, room to grow without crowding the family-facing view
+- [x] Download Queue gains owner-only Pause/Resume/Remove
+- [x] Admin Stack panel — Wanted/Missing (release search reused from
+      issues), Import Issues (stuck/failed Radarr/Sonarr queue items, with
+      Remove), Prowlarr indexer health
 
 ## Ideas
 - [ ] Disk space (Sonarr/Radarr diskspace API)
