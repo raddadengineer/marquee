@@ -265,10 +265,11 @@ body {
   .top-month-grid { grid-template-columns: repeat(2, 1fr); row-gap: 1.5rem; }
 }
 
-/* Admin: Seeding — just two numbers, no file list */
-.stat-pair { display: flex; gap: 1rem; text-align: center; }
-.stat-tile { flex: 1; }
-.stat-value { font-family: var(--display); font-size: 1.6rem; font-weight: 600; color: var(--teal); }
+/* Admin: Seeding — just a handful of numbers, no file list. Wraps to 2x2 on
+   narrow cards instead of squeezing four values onto one line. */
+.stat-pair { display: flex; flex-wrap: wrap; gap: 1rem 0.5rem; text-align: center; }
+.stat-tile { flex: 1 1 35%; min-width: 90px; }
+.stat-value { font-family: var(--display); font-size: 1.4rem; font-weight: 600; color: var(--teal); white-space: nowrap; }
 .stat-label {
   font-family: var(--mono); font-size: 0.64rem; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem;

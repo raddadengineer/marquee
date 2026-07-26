@@ -70,9 +70,10 @@
 - [x] CI: `npm test` now runs automatically on every push to main via
       GitHub Actions, showing a pass/fail check right on the repo — no
       longer relies on someone remembering to run it by hand
-- [x] Admin: Seeding stat in the Stack panel — count of torrents seeding +
+- [x] Admin: Seeding stat in the Stack panel — count of torrents seeding,
       overall ratio (qBittorrent's real all-time "Global ratio", not the
-      session-only figure), just the two numbers, no file list
+      session-only figure), plus total uploaded/downloaded — just the
+      numbers, no file list
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks

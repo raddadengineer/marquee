@@ -502,6 +502,14 @@ async function loadSeeding() {
           <div class="stat-value">${stats.ratio == null ? '—' : stats.ratio.toFixed(2)}</div>
           <div class="stat-label">Ratio</div>
         </div>
+        <div class="stat-tile">
+          <div class="stat-value">${formatBytes(stats.uploadedBytes)}</div>
+          <div class="stat-label">Uploaded</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-value">${formatBytes(stats.downloadedBytes)}</div>
+          <div class="stat-label">Downloaded</div>
+        </div>
       </div>
     `;
   } catch (e) {
