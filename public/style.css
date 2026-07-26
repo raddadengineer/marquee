@@ -544,7 +544,13 @@ body {
   padding: 0.85rem; background: rgba(255,255,255,0.5);
 }
 .service-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; }
-.service-card-name { font-weight: 600; font-size: 0.88rem; }
+/* Same shrink priority as the foot row below — the name truncates before
+   the badge (which is short and fixed either way: Online/Unconfigured/Error)
+   is ever allowed to shrink, so every card's badge stays visually uniform. */
+.service-card-name {
+  font-weight: 600; font-size: 0.88rem; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .service-badge {
   font-family: var(--mono); font-size: 0.64rem; padding: 0.2rem 0.5rem; border-radius: 20px;
   border: 1px solid; white-space: nowrap; flex-shrink: 0;
@@ -557,6 +563,10 @@ body {
   display: flex; align-items: center; gap: 0.35rem;
 }
 .service-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.6rem; }
+/* A long version string (e.g. Plex's) must truncate before the Edit button
+   ever shrinks/wraps — confirmed live, the button was squeezing into a
+   two-line "Edit / ✎" shape instead. */
+.service-card-foot .pill-btn { flex-shrink: 0; white-space: nowrap; }
 .service-card-status-text {
   font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
