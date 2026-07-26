@@ -22,6 +22,8 @@
   setInterval(loadAdminIssues, 30000);
   loadWanted();
   setInterval(loadWanted, 60000);
+  loadImportIssues();
+  setInterval(loadImportIssues, 30000);
 })();
 
 document.getElementById('admin-logout-btn').addEventListener('click', async () => {
@@ -281,4 +283,53 @@ document.getElementById('wanted-body').addEventListener('click', e => {
   if (!btn) return;
   const idx = Number(btn.closest('.pending-row').dataset.idx);
   openReleaseModal(wantedResults[idx]);
+});
+
+// ---------- Stack: Import Issues ----------
+// Radarr/Sonarr's own queue, filtered (server-side) to items something's
+// actually wrong with — a stuck import, a download client error, etc. —
+// not the whole in-progress queue.
+async function loadImportIssues() {
+  const body = document.getElementById('import-issues-body');
+  try {
+    const [radarrItems, sonarrItems] = await Promise.all([
+      api('/api/radarr/queue').then(items => items.map(i => ({ ...i, service: 'radarr' }))).catch(() => []),
+      api('/api/sonarr/queue').then(items => items.map(i => ({ ...i, service: 'sonarr' }))).catch(() => [])
+    ]);
+    const results = [...radarrItems, ...sonarrItems];
+    if (!results.length) { body.innerHTML = '<p class="empty-state">No import issues.</p>'; return; }
+    body.innerHTML = results.map(r => `
+      <div class="pending-row" data-id="${r.id}" data-service="${r.service}">
+        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+        <div class="result-info">
+          <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
+          <div class="issue-message">${escapeHtml(r.reason)}</div>
+        </div>
+        <div class="pending-actions">
+          <button class="remove-queue-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Remove</span></button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    body.innerHTML = '<p class="empty-state">Could not load import issues.</p>';
+  }
+}
+
+document.getElementById('import-issues-body').addEventListener('click', async e => {
+  const btn = e.target.closest('.remove-queue-btn');
+  if (!btn) return;
+  if (!confirm('Remove this from the queue and blocklist the release?')) return;
+  const row = btn.closest('.pending-row');
+  row.querySelectorAll('button').forEach(b => b.disabled = true);
+  btn.querySelector('.btn-label').textContent = '…';
+  try {
+    await api(`/api/${row.dataset.service}/queue/${row.dataset.id}`, { method: 'DELETE' });
+    row.remove();
+    if (!document.getElementById('import-issues-body').children.length) {
+      document.getElementById('import-issues-body').innerHTML = '<p class="empty-state">No import issues.</p>';
+    }
+  } catch (err) {
+    row.querySelectorAll('button').forEach(b => b.disabled = false);
+    btn.querySelector('.btn-label').textContent = 'Remove';
+  }
 });

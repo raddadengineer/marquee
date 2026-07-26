@@ -108,4 +108,47 @@ router.post('/releases/grab', requireAuth, requireOwner, async (req, res) => {
   }
 });
 
+// Sonarr's own view of in-progress downloads — surfaced here only when
+// something's actually wrong (stuck import, download client reports an
+// error, ...), not the whole queue.
+router.get('/queue', requireAuth, requireOwner, async (req, res) => {
+  try {
+    const { data } = await axios.get(`${process.env.SONARR_URL}/api/v3/queue`, {
+      params: { includeSeries: true, includeEpisode: true, pageSize: 50 },
+      headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+    });
+    const results = (data.records || [])
+      .filter(r => r.trackedDownloadStatus && r.trackedDownloadStatus !== 'ok')
+      .map(r => {
+        const seriesTitle = r.series?.title;
+        const epLabel = r.episode ? ` — S${r.episode.seasonNumber}E${r.episode.episodeNumber}` : '';
+        return {
+          id: r.id,
+          title: seriesTitle ? `${seriesTitle}${epLabel}` : r.title,
+          poster: r.series?.images?.find(i => i.coverType === 'poster')?.remoteUrl || null,
+          status: r.trackedDownloadStatus,
+          reason: (r.statusMessages || []).flatMap(s => s.messages || []).join('; ') || r.errorMessage || 'Import issue'
+        };
+      });
+    res.json(results);
+  } catch (err) {
+    console.error('sonarr queue error:', err.code || err.response?.status, err.message);
+    res.status(502).json({ error: 'Could not reach Sonarr' });
+  }
+});
+
+router.delete('/queue/:id', requireAuth, requireOwner, async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+  try {
+    await axios.delete(`${process.env.SONARR_URL}/api/v3/queue/${req.params.id}`, {
+      params: { removeFromClient: true, blocklist: true },
+      headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+    });
+    res.json({ status: 'removed' });
+  } catch (err) {
+    console.error('sonarr queue delete error:', err.response?.status, err.message);
+    res.status(502).json({ error: 'Could not remove item' });
+  }
+});
+
 module.exports = router;

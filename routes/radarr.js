@@ -77,4 +77,44 @@ router.post('/releases/grab', requireAuth, requireOwner, async (req, res) => {
   }
 });
 
+// Radarr's own view of in-progress downloads — surfaced here only when
+// something's actually wrong (stuck import, download client reports an
+// error, ...), not the whole queue, since a healthy download in progress
+// isn't something the owner needs to act on.
+router.get('/queue', requireAuth, requireOwner, async (req, res) => {
+  try {
+    const { data } = await axios.get(`${process.env.RADARR_URL}/api/v3/queue`, {
+      params: { includeMovie: true, pageSize: 50 },
+      headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
+    });
+    const results = (data.records || [])
+      .filter(r => r.trackedDownloadStatus && r.trackedDownloadStatus !== 'ok')
+      .map(r => ({
+        id: r.id,
+        title: r.movie?.title || r.title,
+        poster: r.movie?.images?.find(i => i.coverType === 'poster')?.remoteUrl || null,
+        status: r.trackedDownloadStatus,
+        reason: (r.statusMessages || []).flatMap(s => s.messages || []).join('; ') || r.errorMessage || 'Import issue'
+      }));
+    res.json(results);
+  } catch (err) {
+    console.error('radarr queue error:', err.code || err.response?.status, err.message);
+    res.status(502).json({ error: 'Could not reach Radarr' });
+  }
+});
+
+router.delete('/queue/:id', requireAuth, requireOwner, async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
+  try {
+    await axios.delete(`${process.env.RADARR_URL}/api/v3/queue/${req.params.id}`, {
+      params: { removeFromClient: true, blocklist: true },
+      headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
+    });
+    res.json({ status: 'removed' });
+  } catch (err) {
+    console.error('radarr queue delete error:', err.response?.status, err.message);
+    res.status(502).json({ error: 'Could not remove item' });
+  }
+});
+
 module.exports = router;
