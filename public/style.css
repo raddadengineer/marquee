@@ -414,7 +414,11 @@ body {
 .info-close { position: absolute; top: 0.85rem; right: 0.85rem; z-index: 2; }
 .info-layout { display: flex; gap: 1.5rem; padding: 1.5rem; max-height: 78vh; overflow-y: auto; }
 .info-poster { width: 150px; flex-shrink: 0; border-radius: 12px; object-fit: cover; aspect-ratio: 2/3; background: #E2E6EC; box-shadow: 0 16px 32px -14px rgba(20,25,35,0.4); }
-.info-body { min-width: 0; }
+/* Reserves permanent clearance under .info-close (absolutely positioned over
+   the top-right corner) — on a narrow screen the poster's fixed width leaves
+   little room for this column, so the CH.NN badge (first thing in the body)
+   was reaching far enough right to sit underneath the close button. */
+.info-body { min-width: 0; padding-right: 1.75rem; }
 .info-body h3 { font-family: var(--display); font-size: 1.3rem; font-weight: 600; margin: 0.6rem 0 0.3rem; }
 .info-meta { color: var(--muted); font-family: var(--mono); font-size: 0.78rem; margin: 0 0 0.85rem; }
 .info-overview { font-size: 0.9rem; line-height: 1.55; color: #2b3140; margin: 0; }
