@@ -103,7 +103,8 @@ async function fetchRecentlyAdded(sectionId) {
     if (seasonNum) g.seasons.add(seasonNum);
   }
 
-  return [...groups.values()].slice(0, 10).map(g => {
+  const top = [...groups.entries()].slice(0, 10);
+  return Promise.all(top.map(async ([key, g]) => {
     let title = g.title;
     if (g.eventCount === 1) {
       if (g.singleLabel) title = `${g.title} — ${g.singleLabel}`;
@@ -113,8 +114,25 @@ async function fetchRecentlyAdded(sectionId) {
       const seasons = [...g.seasons];
       title = seasons.length === 1 ? `${g.title} — Season ${seasons[0]}` : `${g.title} — new episodes`;
     }
-    return { title, year: g.year, type: g.type, overview: g.overview, addedAt: g.addedAt, thumb: g.thumb };
-  });
+    // A freshly-aired episode (or a season entry) often has no synopsis of
+    // its own yet — Plex's metadata agent hasn't indexed one within hours of
+    // airing, especially for anime. Same fallback Airing Today already uses
+    // (episode overview -> series overview) rather than showing nothing.
+    let overview = g.overview;
+    if (!overview && !key.startsWith('solo-')) overview = await fetchSeriesSummary(key);
+    return { title, year: g.year, type: g.type, overview, addedAt: g.addedAt, thumb: g.thumb };
+  }));
+}
+
+async function fetchSeriesSummary(ratingKey) {
+  try {
+    const { data } = await axios.get(`${process.env.TAUTULLI_URL}/api/v2`, {
+      params: { apikey: process.env.TAUTULLI_API_KEY, cmd: 'get_metadata', rating_key: ratingKey }
+    });
+    return data.response.data?.summary || '';
+  } catch (e) {
+    return '';
+  }
 }
 
 router.get('/recently-added', requireAuth, async (req, res) => {
