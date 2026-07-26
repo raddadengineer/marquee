@@ -42,6 +42,7 @@ async function fetchMissingMovies() {
       mediaType: 'movie',
       tmdbId: m.tmdbId,
       title: m.title,
+      overview: m.overview || '',
       poster: m.images?.find(i => i.coverType === 'poster')?.remoteUrl || null,
       date: m.releaseDate || m.inCinemas || null
     }));
@@ -61,6 +62,11 @@ async function fetchMissingEpisodes() {
       season: e.seasonNumber,
       episode: e.episodeNumber,
       title: e.series?.title,
+      // Episodes carry no synopsis of their own from this endpoint — only the
+      // series does — and the episode's own title is often still "TBA" for
+      // anything not yet announced in detail.
+      episodeTitle: e.title || null,
+      overview: e.series?.overview || '',
       poster: e.series?.images?.find(i => i.coverType === 'poster')?.remoteUrl || null,
       date: e.airDateUtc
     }));

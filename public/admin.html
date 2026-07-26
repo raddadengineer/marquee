@@ -72,6 +72,27 @@
   </div>
 </div>
 
+<!-- WANTED/MISSING INFO MODAL -->
+<div id="wanted-info-modal" class="modal hidden">
+  <div class="modal-card info-card">
+    <button id="close-wanted-info-btn" class="pill-btn pill-btn-icon info-close">&#10005;</button>
+    <div class="info-layout">
+      <img id="wanted-info-poster" class="info-poster" src="" onerror="this.style.visibility='hidden'">
+      <div class="info-body">
+        <span id="wanted-info-badge" class="chan"></span>
+        <h3 id="wanted-info-title"></h3>
+        <p id="wanted-info-meta" class="info-meta"></p>
+        <p id="wanted-info-overview" class="info-overview"></p>
+        <div class="pending-actions">
+          <button id="wanted-info-search-btn" class="search-release-btn pill-btn">
+            <span class="state-dot"></span><span class="btn-label">Search</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="shared.js?v={{ASSET_VERSION}}"></script>
 <script src="admin.js?v={{ASSET_VERSION}}"></script>
 </body>

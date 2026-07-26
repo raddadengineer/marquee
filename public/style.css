@@ -456,6 +456,9 @@ body {
 .pending-requester { display: flex; align-items: center; gap: 0.35rem; margin-top: 3px; font-size: 0.74rem; color: var(--muted); font-family: var(--mono); }
 .pending-requester img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; background: #E2E6EC; }
 .pending-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+/* Only Wanted/Missing rows open a details view on click — the other
+   .pending-row uses (pending requests, open issues, import issues) don't. */
+#wanted-body .pending-row { cursor: pointer; }
 
 /* "Request" — shown on the info modal when opened from a search/discover
    result (not yet in the library), so a title/poster click leads to details

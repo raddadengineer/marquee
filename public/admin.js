@@ -351,11 +351,41 @@ async function loadWanted() {
   }
 }
 
+// Clicking the Search button on a row goes straight to the release search, as
+// before; clicking anywhere else on the row shows poster/overview/release
+// details first — same "details before committing" pattern as the main
+// dashboard's request modal.
 document.getElementById('wanted-body').addEventListener('click', e => {
-  const btn = e.target.closest('.search-release-btn');
-  if (!btn) return;
-  const idx = Number(btn.closest('.pending-row').dataset.idx);
-  openReleaseModal(wantedResults[idx]);
+  const row = e.target.closest('.pending-row');
+  if (!row) return;
+  const item = wantedResults[Number(row.dataset.idx)];
+  if (!item) return;
+  if (e.target.closest('.search-release-btn')) {
+    openReleaseModal(item);
+    return;
+  }
+  openWantedInfo(item);
+});
+
+function openWantedInfo(item) {
+  const posterEl = document.getElementById('wanted-info-poster');
+  posterEl.style.visibility = '';
+  posterEl.src = item.poster || '';
+  document.getElementById('wanted-info-title').textContent = item.title || '';
+  document.getElementById('wanted-info-badge').textContent = item.mediaType === 'tv' ? 'TV' : 'MOVIE';
+  document.getElementById('wanted-info-meta').textContent = item.season
+    ? `S${item.season}E${item.episode}${item.episodeTitle ? ' — ' + item.episodeTitle : ''} · Released ${formatDate(item.date)}`
+    : `Released ${formatDate(item.date)}`;
+  document.getElementById('wanted-info-overview').textContent = item.overview || 'No synopsis available.';
+  document.getElementById('wanted-info-search-btn').onclick = () => {
+    document.getElementById('wanted-info-modal').classList.add('hidden');
+    openReleaseModal(item);
+  };
+  document.getElementById('wanted-info-modal').classList.remove('hidden');
+}
+
+document.getElementById('close-wanted-info-btn').addEventListener('click', () => {
+  document.getElementById('wanted-info-modal').classList.add('hidden');
 });
 
 // ---------- Stack: Import Issues ----------
