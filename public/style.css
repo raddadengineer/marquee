@@ -520,10 +520,13 @@ body {
 /* Settings modal (owner only) — service health grid + per-service/deployment
    edit popups. Saving anything restarts the container (see routes/settings.js),
    since Node only loads .env once at process start. */
-.settings-card { width: min(780px, 94vw); }
-.settings-body { flex: 1; min-height: 0; overflow-y: auto; margin: 0.5rem 0; }
-.settings-section-row { display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; }
-.settings-section-row .admin-subhead { margin: 0; }
+.settings-card { width: min(780px, 94vw); overflow-x: hidden; }
+.settings-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0.5rem 0; }
+/* wraps instead of squeezing "Run Health Check"/"Edit Deployment Settings"
+   into a cramped two-line button next to the heading on narrow screens */
+.settings-section-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.85rem; }
+.settings-section-row .admin-subhead { margin: 0; min-width: 0; }
+.settings-section-row .pill-btn { white-space: nowrap; }
 .settings-section-row-spaced { margin-top: 1.4rem; }
 .settings-status { font-size: 0.8rem; text-align: center; margin: 0.5rem 0 0; }
 .settings-status.error { color: var(--danger); }
@@ -532,7 +535,14 @@ body {
 /* Service health cards */
 .service-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; margin: 0.75rem 0; }
 @media (max-width: 700px) { .service-grid { grid-template-columns: repeat(2, 1fr); } }
-.service-card { border: 1px solid rgba(20,25,35,0.08); border-radius: 12px; padding: 0.85rem; background: rgba(255,255,255,0.5); }
+/* Two columns of cards (each with a version string, latency, and Edit button)
+   is too cramped on an actual phone width — confirmed live, cards were
+   overflowing their column and getting clipped by the modal's own edge. */
+@media (max-width: 480px) { .service-grid { grid-template-columns: 1fr; } }
+.service-card {
+  min-width: 0; border: 1px solid rgba(20,25,35,0.08); border-radius: 12px;
+  padding: 0.85rem; background: rgba(255,255,255,0.5);
+}
 .service-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; }
 .service-card-name { font-weight: 600; font-size: 0.88rem; }
 .service-badge {
