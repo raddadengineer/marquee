@@ -134,6 +134,9 @@ body {
   /* The report icon button in the header is desktop-only — .fab-left below is
      its mobile equivalent, mirroring the request FAB on the opposite side. */
   .hero-icons #report-search-btn { display: none; }
+  /* Admin link is desktop-only — no mobile equivalent, it's a low-frequency
+     destination and mobile's icon row is already at capacity. */
+  .hero-icons #admin-link-btn { display: none; }
 }
 .avatar-chip {
   display: flex; align-items: center; gap: 0.55rem; padding: 0.35rem 0.7rem 0.35rem 0.35rem;

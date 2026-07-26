@@ -3,12 +3,6 @@ const dashboardScreen = document.getElementById('dashboard-screen');
 const signinStatus = document.getElementById('signin-status');
 const store = { nowPlaying: [], recentlyWatched: [], recentlyAdded: [], airingToday: [], upcoming: [] };
 
-async function api(path, opts = {}) {
-  const res = await fetch(path, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
-  return res.json();
-}
-
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
@@ -83,7 +77,10 @@ function pollSignIn(popup) {
   }
 })();
 
-function showDashboard(isOwner) {
+let isOwner = false;
+
+function showDashboard(owner) {
+  isOwner = owner;
   signinScreen.classList.add('hidden');
   dashboardScreen.classList.remove('hidden');
   setHeroDate();
@@ -95,17 +92,9 @@ function showDashboard(isOwner) {
   loadUpcoming();
   loadDownloads();
   setInterval(loadDownloads, 5000);
-  if (isOwner) {
-    document.getElementById('panel-owner').classList.remove('hidden');
-    loadOwnerStatus();
-    setInterval(loadOwnerStatus, 15000);
-    document.getElementById('panel-admin').classList.remove('hidden');
-    loadAdminLogins();
-    loadPendingRequests();
-    setInterval(loadPendingRequests, 30000);
-    loadAdminIssues();
-    setInterval(loadAdminIssues, 30000);
-  }
+  // Everything owner-only (sign-ins, pending requests, issues, system status,
+  // stack management) lives on its own page now instead of crowding this one.
+  document.getElementById('admin-link-btn').classList.toggle('hidden', !isOwner);
 }
 
 function setHeroDate() {
@@ -342,16 +331,6 @@ async function loadDownloads() {
   }
 }
 
-function formatSpeed(kbps) {
-  return kbps >= 1024 ? `${(kbps / 1024).toFixed(1)} MB/s` : `${kbps} KB/s`;
-}
-
-function formatEta(seconds) {
-  if (seconds >= 3600) return `${Math.round(seconds / 3600)}h left`;
-  if (seconds >= 60) return `${Math.round(seconds / 60)}m left`;
-  return `${seconds}s left`;
-}
-
 // ---------- Top of the Month ----------
 async function loadTopOfMonth() {
   const body = document.getElementById('top-month-body');
@@ -401,229 +380,6 @@ function renderTopMonthTile(label, items, isUser) {
       </div>
     </div>
   `;
-}
-
-// ---------- Owner Status (owner only — Uptime Kuma + UPS) ----------
-async function loadOwnerStatus() {
-  const body = document.getElementById('owner-body');
-  try {
-    const { monitors, ups } = await api('/api/owner/status');
-    let html = '';
-    if (ups) {
-      const onBattery = ups.status.includes('OB');
-      html += `
-        <div class="ups-status">
-          <div class="now-title">${escapeHtml(ups.model || 'UPS')}</div>
-          <div class="now-meta">
-            <span class="${dotClass(onBattery)}"></span>
-            ${escapeHtml(formatUpsStatus(ups.status))}${ups.loadPercent != null ? ' · ' + ups.loadPercent + '% load' : ''}${ups.batteryRuntimeSeconds != null ? ' · ' + formatEta(ups.batteryRuntimeSeconds) + ' runtime' : ''}
-          </div>
-          ${ups.batteryChargePercent != null ? `<div class="bar"><div class="bar-fill" style="width:${ups.batteryChargePercent}%"></div></div>` : ''}
-        </div>
-      `;
-    }
-    if (monitors.length) {
-      html += `<div class="monitor-pills">${monitors.map(m => `
-        <span class="monitor-pill ${m.status}"><span class="${dotClass(m.status !== 'up')}"></span>${escapeHtml(m.name)}</span>
-      `).join('')}</div>`;
-    }
-    body.innerHTML = html || '<p class="empty-state">Nothing configured.</p>';
-  } catch (e) {
-    body.innerHTML = '<p class="empty-state">Could not reach status sources.</p>';
-  }
-}
-
-// ---------- Admin panel (owner only) ----------
-async function loadAdminLogins() {
-  const body = document.getElementById('admin-logins-body');
-  try {
-    const logins = await api('/api/owner/logins');
-    body.innerHTML = !logins.length ? '<p class="empty-state">No sign-ins recorded yet.</p>' : logins.map(l => `
-      <div class="login-row">
-        <img class="login-avatar" src="${l.thumb || ''}" onerror="this.style.visibility='hidden'">
-        <div>
-          <div class="login-name">${escapeHtml(l.username)}${l.isOwner ? ' · Owner' : ''}</div>
-          <div class="login-time">${timeAgo(l.at)}</div>
-        </div>
-      </div>
-    `).join('');
-  } catch (e) {
-    body.innerHTML = '<p class="empty-state">Could not load sign-ins.</p>';
-  }
-}
-
-async function loadPendingRequests() {
-  const body = document.getElementById('admin-requests-body');
-  try {
-    const results = await api('/api/overseerr/requests/pending');
-    if (!results.length) { body.innerHTML = '<p class="empty-state">Nothing pending.</p>'; return; }
-    body.innerHTML = results.map(r => `
-      <div class="pending-row" data-id="${r.id}">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
-        <div class="result-info">
-          <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
-          <div class="pending-requester">
-            <img src="${r.requestedByAvatar || ''}" onerror="this.style.visibility='hidden'">
-            ${escapeHtml(r.requestedBy)} · ${timeAgo(r.requestedAt)}
-          </div>
-        </div>
-        <div class="pending-actions">
-          <button class="approve-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Approve</span></button>
-          <button class="decline-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Decline</span></button>
-        </div>
-      </div>
-    `).join('');
-  } catch (e) {
-    body.innerHTML = '<p class="empty-state">Could not load pending requests.</p>';
-  }
-}
-
-document.getElementById('admin-requests-body').addEventListener('click', async e => {
-  const btn = e.target.closest('.approve-btn, .decline-btn');
-  if (!btn) return;
-  const row = btn.closest('.pending-row');
-  const action = btn.classList.contains('approve-btn') ? 'approve' : 'decline';
-  row.querySelectorAll('button').forEach(b => b.disabled = true);
-  btn.querySelector('.btn-label').textContent = '…';
-  try {
-    await api(`/api/overseerr/requests/${row.dataset.id}/${action}`, { method: 'POST' });
-    row.remove();
-    if (!document.getElementById('admin-requests-body').children.length) {
-      document.getElementById('admin-requests-body').innerHTML = '<p class="empty-state">Nothing pending.</p>';
-    }
-  } catch (e) {
-    row.querySelectorAll('button').forEach(b => b.disabled = false);
-    btn.querySelector('.btn-label').textContent = action === 'approve' ? 'Approve' : 'Decline';
-  }
-});
-
-async function loadAdminIssues() {
-  const body = document.getElementById('admin-issues-body');
-  try {
-    const results = await api('/api/overseerr/issues/open');
-    if (!results.length) { body.innerHTML = '<p class="empty-state">Nothing open.</p>'; return; }
-    body.innerHTML = results.map(r => `
-      <div class="pending-row" data-id="${r.id}" data-title="${escapeHtml(r.title || 'Unknown title')}"
-           data-media-type="${r.mediaType || ''}" data-tmdb-id="${r.tmdbId || ''}" data-tvdb-id="${r.tvdbId || ''}"
-           data-season="${r.season || ''}" data-episode="${r.episode || ''}">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
-        <div class="result-info">
-          <div class="result-title">${escapeHtml(r.title || 'Unknown title')}${r.season ? ` — S${r.season}E${r.episode}` : ''}</div>
-          <div class="pending-requester">
-            <img src="${r.reportedByAvatar || ''}" onerror="this.style.visibility='hidden'">
-            ${escapeHtml(r.reportedBy)} · ${r.issueType} · ${timeAgo(r.reportedAt)}
-          </div>
-          ${r.message ? `<div class="issue-message">${escapeHtml(r.message)}</div>` : ''}
-        </div>
-        <div class="pending-actions">
-          <button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>
-          <button class="approve-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Resolve</span></button>
-        </div>
-      </div>
-    `).join('');
-  } catch (e) {
-    body.innerHTML = '<p class="empty-state">Could not load issues.</p>';
-  }
-}
-
-document.getElementById('admin-issues-body').addEventListener('click', async e => {
-  const searchBtn = e.target.closest('.search-release-btn');
-  if (searchBtn) {
-    openReleaseModal(searchBtn.closest('.pending-row').dataset);
-    return;
-  }
-  const btn = e.target.closest('.approve-btn');
-  if (!btn) return;
-  const row = btn.closest('.pending-row');
-  row.querySelectorAll('button').forEach(b => b.disabled = true);
-  btn.querySelector('.btn-label').textContent = '…';
-  try {
-    await api(`/api/overseerr/issues/${row.dataset.id}/resolve`, { method: 'POST' });
-    row.remove();
-    if (!document.getElementById('admin-issues-body').children.length) {
-      document.getElementById('admin-issues-body').innerHTML = '<p class="empty-state">Nothing open.</p>';
-    }
-  } catch (e) {
-    row.querySelectorAll('button').forEach(b => b.disabled = false);
-    btn.querySelector('.btn-label').textContent = 'Resolve';
-  }
-});
-
-// ---------- Release search modal (owner only) ----------
-// Interactive search against Radarr/Sonarr's own configured indexers, so a
-// bad/wrong release reported as an issue can be fixed without leaving the
-// dashboard. Can take up to ~a minute — this is a live indexer search, not a
-// cached lookup, same as Sonarr/Radarr's own "Interactive Search" UI.
-function formatBytes(bytes) {
-  if (!bytes) return '';
-  return (bytes / (1024 ** 3)).toFixed(1) + ' GB';
-}
-
-async function openReleaseModal(ctx) {
-  const modal = document.getElementById('release-modal');
-  const listEl = document.getElementById('release-list');
-  document.getElementById('release-modal-title').textContent = ctx.title +
-    (ctx.season ? ` — S${ctx.season}E${ctx.episode}` : '');
-  listEl.innerHTML = '<p class="empty-state">Searching indexers… this can take up to a minute.</p>';
-  modal.classList.remove('hidden');
-
-  const isMovie = ctx.mediaType === 'movie';
-  const url = isMovie
-    ? `/api/radarr/releases?tmdbId=${ctx.tmdbId}`
-    : `/api/sonarr/releases?tvdbId=${ctx.tvdbId}&season=${ctx.season}&episode=${ctx.episode}`;
-  const grabUrl = isMovie ? '/api/radarr/releases/grab' : '/api/sonarr/releases/grab';
-
-  try {
-    const releases = await api(url);
-    if (!releases.length) { listEl.innerHTML = '<p class="empty-state">No releases found.</p>'; return; }
-    listEl.innerHTML = releases.map(r => `
-      <div class="release-row ${r.rejected ? 'rejected' : ''}">
-        <div class="release-info">
-          <div class="release-title" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</div>
-          <div class="release-meta">
-            ${escapeHtml(r.quality || 'Unknown')} · ${formatBytes(r.sizeBytes)} · ${escapeHtml(r.indexer)}
-            · ${r.protocol === 'torrent' ? `${r.seeders ?? 0} seeders` : `${r.ageDays ?? '?'}d old`}
-          </div>
-          ${r.rejected ? `<div class="release-rejections">${escapeHtml(r.rejections.join(', '))}</div>` : ''}
-        </div>
-        <button class="grab-btn pill-btn" data-guid="${escapeHtml(r.guid)}" data-indexer-id="${r.indexerId}">
-          <span class="state-dot"></span><span class="btn-label">Grab</span>
-        </button>
-      </div>
-    `).join('');
-  } catch (e) {
-    listEl.innerHTML = `<p class="empty-state">${escapeHtml(e.message || 'Search failed.')}</p>`;
-  }
-
-  listEl.onclick = async e => {
-    const btn = e.target.closest('.grab-btn');
-    if (!btn) return;
-    btn.disabled = true;
-    btn.querySelector('.btn-label').textContent = 'Grabbing…';
-    try {
-      await api(grabUrl, {
-        method: 'POST',
-        body: JSON.stringify({ guid: btn.dataset.guid, indexerId: Number(btn.dataset.indexerId) })
-      });
-      btn.querySelector('.btn-label').textContent = 'Grabbed ✓';
-    } catch (err) {
-      btn.disabled = false;
-      btn.querySelector('.btn-label').textContent = 'Grab';
-    }
-  };
-}
-
-document.getElementById('close-release-modal-btn').addEventListener('click', () => {
-  document.getElementById('release-modal').classList.add('hidden');
-});
-
-function formatUpsStatus(status) {
-  const flags = {
-    OL: 'Online', OB: 'On Battery', LB: 'Low Battery', CHRG: 'Charging', DISCHRG: 'Discharging',
-    RB: 'Replace Battery', BYPASS: 'Bypass', CAL: 'Calibrating', OFF: 'Offline', OVER: 'Overloaded',
-    TRIM: 'Trimming', BOOST: 'Boosting', FSD: 'Forced Shutdown'
-  };
-  return status.split(' ').map(f => flags[f] || f).join(' · ');
 }
 
 // ---------- Request modal ----------
@@ -1184,9 +940,6 @@ function renderStreamInfo(stream) {
   `).join('');
 }
 
-function titleCase(str) {
-  return str.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
-}
 document.getElementById('close-info-btn').addEventListener('click', () => infoModal.classList.add('hidden'));
 infoModal.addEventListener('click', e => { if (e.target === infoModal) infoModal.classList.add('hidden'); });
 
@@ -1272,23 +1025,3 @@ document.getElementById('upcoming-body').addEventListener('click', e => {
   });
 });
 
-// ---------- Helpers ----------
-function dotClass(bad) {
-  return 'state-dot' + (bad ? ' paused' : '');
-}
-function escapeHtml(str = '') {
-  return str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-function timeAgo(ts) {
-  // Accepts either an epoch-ms number (Tautulli/login log) or an ISO date string
-  // (Overseerr's createdAt) — normalize through Date so both work.
-  const mins = Math.round((Date.now() - new Date(ts).getTime()) / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
-function formatDate(iso) {
-  if (!iso) return 'TBA';
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}

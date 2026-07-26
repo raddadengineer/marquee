@@ -48,6 +48,7 @@
         <div class="hero-icons">
           <button id="search-btn" class="icon-btn" aria-label="Request something">+</button>
           <button id="report-search-btn" class="icon-btn" aria-label="Report an issue">&#9873;</button>
+          <a id="admin-link-btn" href="/admin" class="icon-btn hidden" aria-label="Admin">&#9881;</a>
           <div class="avatar-chip">
             <div class="avatar"></div>
             <div><div class="avatar-name" id="whoami"></div><div class="avatar-role">Signed in</div></div>
@@ -103,21 +104,6 @@
       <section class="card span4" id="panel-downloads">
         <div class="card-label"><span class="chan">CH.07</span> Download Queue</div>
         <div id="downloads-body"><p class="empty-state">Loading…</p></div>
-      </section>
-
-      <section class="card span4 hidden" id="panel-owner">
-        <div class="card-label"><span class="chan">CH.08</span> System Status</div>
-        <div id="owner-body"><p class="empty-state">Loading…</p></div>
-      </section>
-
-      <section class="card span4 hidden" id="panel-admin">
-        <div class="card-label"><span class="chan">CH.09</span> Admin</div>
-        <h4 class="admin-subhead">Recent sign-ins</h4>
-        <div id="admin-logins-body"><p class="empty-state">Loading…</p></div>
-        <h4 class="admin-subhead">Pending requests</h4>
-        <div id="admin-requests-body"><p class="empty-state">Loading…</p></div>
-        <h4 class="admin-subhead">Open issues</h4>
-        <div id="admin-issues-body"><p class="empty-state">Loading…</p></div>
       </section>
 
     </div>
@@ -212,18 +198,6 @@
   </div>
 </div>
 
-<!-- RELEASE SEARCH MODAL (owner only — search Radarr/Sonarr's indexers directly
-     from an open issue, to fix a bad file without leaving the dashboard) -->
-<div id="release-modal" class="modal hidden">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3 id="release-modal-title">Search for a release</h3>
-      <button id="close-release-modal-btn" class="pill-btn pill-btn-icon">&#10005;</button>
-    </div>
-    <div id="release-list" class="release-list"><p class="empty-state">Loading…</p></div>
-  </div>
-</div>
-
 <!-- MEDIA INFO MODAL -->
 <div id="info-modal" class="modal hidden">
   <div class="modal-card info-card">
@@ -264,6 +238,7 @@
 
 <div id="toast-container"></div>
 
+<script src="shared.js?v={{ASSET_VERSION}}"></script>
 <script src="app.js?v={{ASSET_VERSION}}"></script>
 </body>
 </html>

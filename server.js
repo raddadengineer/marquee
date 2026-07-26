@@ -79,12 +79,24 @@ const renderedHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'
   .replaceAll('{{ASSET_VERSION}}', assetVersion);
 const renderedManifest = fs.readFileSync(path.join(__dirname, 'public', 'manifest.webmanifest'), 'utf8')
   .replaceAll('{{SITE_NAME}}', siteName);
+// Owner-only control center — a separate page (not just a hidden panel) so
+// it can grow without crowding the shared family dashboard. Actual access
+// control happens server-side on every /api/owner, /api/*/queue,
+// /api/*/releases, etc. route (requireAuth + requireOwner) — this page is
+// just a shell, same as index.html.
+const renderedAdminHtml = fs.readFileSync(path.join(__dirname, 'public', 'admin.html'), 'utf8')
+  .replaceAll('{{SITE_NAME}}', siteName)
+  .replaceAll('{{ASSET_VERSION}}', assetVersion);
 
 app.get('/', (req, res) => {
   // Always revalidate the page shell itself, so it picks up the new asset
   // version immediately rather than also being stuck on a stale cached copy.
   res.set('Cache-Control', 'no-cache');
   res.type('html').send(renderedHtml);
+});
+app.get('/admin', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.type('html').send(renderedAdminHtml);
 });
 // Same {{SITE_NAME}} templating as index.html, so an installed PWA's home-screen
 // label matches whatever this deployment is branded as instead of the generic

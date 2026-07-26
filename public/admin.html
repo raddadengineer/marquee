@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{SITE_NAME}} — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v={{ASSET_VERSION}}">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- HERO MASTHEAD -->
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="logo">{{SITE_NAME}}</div>
+        <div class="logo-tag">Admin</div>
+      </div>
+      <div class="hero-icons">
+        <a href="/" class="icon-btn" aria-label="Back to dashboard">&#8592;</a>
+        <button id="admin-logout-btn" class="icon-btn" aria-label="Sign out">&#8594;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BENTO GRID -->
+  <div class="bento">
+
+    <section class="card span4" id="panel-owner">
+      <div class="card-label"><span class="chan">CH.08</span> System Status</div>
+      <div id="owner-body"><p class="empty-state">Loading…</p></div>
+    </section>
+
+    <section class="card span4" id="panel-admin">
+      <div class="card-label"><span class="chan">CH.09</span> Family</div>
+      <h4 class="admin-subhead">Recent sign-ins</h4>
+      <div id="admin-logins-body"><p class="empty-state">Loading…</p></div>
+      <h4 class="admin-subhead">Pending requests</h4>
+      <div id="admin-requests-body"><p class="empty-state">Loading…</p></div>
+      <h4 class="admin-subhead">Open issues</h4>
+      <div id="admin-issues-body"><p class="empty-state">Loading…</p></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- RELEASE SEARCH MODAL -->
+<div id="release-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="release-modal-title">Search for a release</h3>
+      <button id="close-release-modal-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+    <div id="release-list" class="release-list"><p class="empty-state">Loading…</p></div>
+  </div>
+</div>
+
+<script src="shared.js?v={{ASSET_VERSION}}"></script>
+<script src="admin.js?v={{ASSET_VERSION}}"></script>
+</body>
+</html>
