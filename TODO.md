@@ -58,6 +58,15 @@
       extraction, file-info/discover-item mapping. Deliberately scoped to
       logic, not live Radarr/Sonarr/Overseerr integration — that's still
       verified by hand, which has caught more real bugs than fixtures would
+- [x] Dependency vulnerabilities cleared (`npm audit`: 12 -> 0, 1 critical/9
+      high) — all traced back to sqlite3's build-only toolchain (node-gyp's
+      tar/glob/etc., never runs at server runtime). Bumped sqlite3 5.1.7 ->
+      6.0.1, added an `overrides` entry for connect-sqlite3's stale peer
+      range (it never actually imports sqlite3, just accepts an injected
+      Database instance), switched the Dockerfile to `npm ci` for
+      reproducible installs. Verified live: existing sessions, Uptime Kuma
+      reads, and the login log all still work against the pre-upgrade
+      on-disk data with zero migration needed
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks
