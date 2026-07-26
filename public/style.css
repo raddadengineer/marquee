@@ -94,9 +94,13 @@ body {
   width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.18);
   border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1rem;
-  cursor: pointer; line-height: 1;
+  cursor: pointer; line-height: 1; text-decoration: none;
 }
 .icon-btn:hover { background: rgba(255,255,255,0.28); }
+/* An SVG child (admin-link-btn) defaults to inline, which leaves a few px of
+   baseline whitespace under it even inside a flex-centered parent — block
+   avoids that so it centers exactly like the text-glyph icon buttons do. */
+.icon-btn svg { display: block; }
 
 /* Floating request button — mobile only (see the media query below); desktop
    keeps the plain header icon button (.icon-btn above) instead. Styled to match
@@ -134,9 +138,9 @@ body {
   /* The report icon button in the header is desktop-only — .fab-left below is
      its mobile equivalent, mirroring the request FAB on the opposite side. */
   .hero-icons #report-search-btn { display: none; }
-  /* Admin link is desktop-only — no mobile equivalent, it's a low-frequency
-     destination and mobile's icon row is already at capacity. */
-  .hero-icons #admin-link-btn { display: none; }
+  /* Admin link has no FAB equivalent (it's low-frequency, doesn't warrant a
+     third floating button) — stays in the header icon row on mobile too,
+     alongside the avatar chip and logout button which are already there. */
 }
 .avatar-chip {
   display: flex; align-items: center; gap: 0.55rem; padding: 0.35rem 0.7rem 0.35rem 0.35rem;
