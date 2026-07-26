@@ -68,6 +68,18 @@ router.post('/queue/:type/:id/resume', requireAuth, requireOwner, async (req, re
   }
 });
 
+// qBittorrent only — SABnzbd/usenet has no seeding concept. Absent entirely
+// (not an error) when qBittorrent isn't configured for this deployment.
+router.get('/seeding', requireAuth, requireOwner, async (req, res) => {
+  if (!process.env.QBITTORRENT_URL) return res.json(null);
+  try {
+    res.json(await qbittorrent.getSeedingStats());
+  } catch (err) {
+    console.error('qbittorrent seeding stats error:', err.message);
+    res.status(502).json({ error: 'Could not reach qBittorrent' });
+  }
+});
+
 router.delete('/queue/:type/:id', requireAuth, requireOwner, async (req, res) => {
   const service = serviceFor(req.params.type);
   if (!service || !ID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid item' });

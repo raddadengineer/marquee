@@ -265,6 +265,15 @@ body {
   .top-month-grid { grid-template-columns: repeat(2, 1fr); row-gap: 1.5rem; }
 }
 
+/* Admin: Seeding — just two numbers, no file list */
+.stat-pair { display: flex; gap: 1rem; text-align: center; }
+.stat-tile { flex: 1; }
+.stat-value { font-family: var(--display); font-size: 1.6rem; font-weight: 600; color: var(--teal); }
+.stat-label {
+  font-family: var(--mono); font-size: 0.64rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem;
+}
+
 /* Owner-only status panel */
 .ups-status { padding-bottom: 0.85rem; margin-bottom: 0.85rem; border-bottom: 1px solid rgba(20,25,35,0.06); }
 .monitor-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; }

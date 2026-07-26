@@ -22,6 +22,8 @@
   setInterval(loadAdminIssues, 30000);
   loadDiskSpace();
   setInterval(loadDiskSpace, 60000);
+  loadSeeding();
+  setInterval(loadSeeding, 60000);
   loadDownloadIssues();
   setInterval(loadDownloadIssues, 15000);
   loadWanted();
@@ -479,6 +481,31 @@ async function loadDiskSpace() {
     `).join('');
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not load disk space.</p>';
+  }
+}
+
+// ---------- Stack: Seeding ----------
+// Just the count + overall ratio, no per-torrent list — qBittorrent's own
+// "Global ratio" (all-time uploaded/downloaded), not a session-only figure.
+async function loadSeeding() {
+  const body = document.getElementById('seeding-body');
+  try {
+    const stats = await api('/api/downloads/seeding');
+    if (!stats) { body.innerHTML = '<p class="empty-state">qBittorrent not configured.</p>'; return; }
+    body.innerHTML = `
+      <div class="stat-pair">
+        <div class="stat-tile">
+          <div class="stat-value">${stats.seedingCount}</div>
+          <div class="stat-label">Seeding</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-value">${stats.ratio == null ? '—' : stats.ratio.toFixed(2)}</div>
+          <div class="stat-label">Ratio</div>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    body.innerHTML = '<p class="empty-state">Could not load seeding stats.</p>';
   }
 }
 
