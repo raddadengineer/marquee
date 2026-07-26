@@ -48,3 +48,14 @@
 - [x] Admin: current file info (quality/resolution/codecs/size/date added)
       shown before searching for a replacement, from both Search Library and
       Open Issues — see what you have before deciding to replace it
+- [x] CSRF protection — every state-changing request now needs an Origin
+      header matching its own Host (no hardcoded domain, no frontend
+      changes); Overseerr's server-to-server webhook is explicitly exempted
+      since it's already authenticated by its own shared secret
+
+## Ideas
+- [ ] Continue Watching / resume progress panel (Tautulli already tracks
+      per-user watch position — reuse for a "pick up where you left off" tile)
+- [ ] Automated test coverage — every feature so far has been verified by
+      hand against live Radarr/Sonarr/Overseerr data over SSH, which won't
+      scale as the admin surface keeps growing

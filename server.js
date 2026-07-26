@@ -20,6 +20,35 @@ app.use((req, res, next) => {
   next();
 });
 
+// CSRF protection: the session cookie's sameSite:'lax' already stops browsers
+// from attaching it to a cross-site POST/PUT/DELETE, but that's an implicit
+// side effect of a cookie setting, not something the server itself verifies —
+// this makes it explicit. Every state-changing request must carry an Origin
+// header whose host matches the request's own Host header (works the same
+// whichever hostname/port this is actually reached on — Cloudflare domain or
+// direct LAN IP — no hardcoded origin to keep in sync).
+// Exempt: Overseerr's own webhook, which is called server-to-server (never
+// carries a browser Origin) and is already authenticated by its own shared
+// secret — see routes/overseerr.js's /webhook handler.
+const CSRF_EXEMPT_PATHS = new Set(['/api/overseerr/webhook']);
+app.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (CSRF_EXEMPT_PATHS.has(req.path)) return next();
+
+  const origin = req.headers.origin;
+  if (!origin) return res.status(403).json({ error: 'Missing Origin header' });
+  let originHost;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return res.status(403).json({ error: 'Invalid Origin header' });
+  }
+  if (originHost !== req.headers.host) {
+    return res.status(403).json({ error: 'Cross-origin request blocked' });
+  }
+  next();
+});
+
 // Persists sessions to disk so the family isn't logged out on every
 // `docker compose up -d --build` or container restart.
 const sessionDbDir = process.env.SESSION_DB_DIR || '/app/data';
