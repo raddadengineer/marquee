@@ -8,6 +8,7 @@ const sse = require('../lib/sse');
 const tautulliMedia = require('../lib/tautulliMedia');
 const { adminClient, mapDiscoverItem } = require('../lib/overseerrClient');
 const downloadQueueIds = require('../lib/downloadQueueIds');
+const { computeAvailability } = require('../lib/requestAvailability');
 const router = express.Router();
 
 // Unlike the read-only endpoints below, these have a real side effect (creates an
@@ -169,26 +170,10 @@ router.get('/requests/mine', requireAuth, async (req, res) => {
     const results = await Promise.all(data.results.map(async r => {
       const mediaType = r.type; // 'movie' | 'tv'
       const { title, poster } = await resolveMedia(mediaType, r.media?.tmdbId);
-      // Four different things worth showing distinctly: whether the request
-      // itself needs approval (r.status: 1 pending, 2 approved, 3 declined),
-      // whether the underlying media is actually available yet (r.media.status:
-      // 4/5 = available), whether it's genuinely sitting in Radarr/Sonarr's
-      // download queue right now, or whether it's just approved with nothing
-      // actually happening yet. That last case matters: Overseerr sets
-      // media.status to PROCESSING the instant a request is approved and handed
-      // off, even for a movie that hasn't been released yet and has no release
-      // to grab — confirmed live (Clayface, releases 2027, empty Radarr queue)
-      // showing as "Downloading" — so PROCESSING alone can't be trusted as
-      // "downloading"; only actual presence in the *arr queue can.
-      const mediaStatus = r.media?.status;
       const inQueue = mediaType === 'movie'
         ? queued.movieIds.has(r.media?.externalServiceId)
         : queued.seriesIds.has(r.media?.externalServiceId);
-      const availability = r.status === 3 ? 'declined'
-        : [4, 5].includes(mediaStatus) ? 'available'
-        : r.status === 1 ? 'pending'
-        : inQueue ? 'downloading'
-        : 'approved';
+      const availability = computeAvailability({ requestStatus: r.status, mediaStatus: r.media?.status, inQueue });
       return { title, poster, mediaType, availability, requestedAt: r.createdAt };
     }));
 

@@ -6,6 +6,7 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
+const { checkOrigin } = require('./lib/csrfOrigin');
 
 const app = express();
 
@@ -31,22 +32,18 @@ app.use((req, res, next) => {
 // carries a browser Origin) and is already authenticated by its own shared
 // secret — see routes/overseerr.js's /webhook handler.
 const CSRF_EXEMPT_PATHS = new Set(['/api/overseerr/webhook']);
+const CSRF_ERROR_MESSAGES = {
+  missing: 'Missing Origin header',
+  invalid: 'Invalid Origin header',
+  mismatch: 'Cross-origin request blocked'
+};
 app.use((req, res, next) => {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   if (CSRF_EXEMPT_PATHS.has(req.path)) return next();
 
-  const origin = req.headers.origin;
-  if (!origin) return res.status(403).json({ error: 'Missing Origin header' });
-  let originHost;
-  try {
-    originHost = new URL(origin).host;
-  } catch {
-    return res.status(403).json({ error: 'Invalid Origin header' });
-  }
-  if (originHost !== req.headers.host) {
-    return res.status(403).json({ error: 'Cross-origin request blocked' });
-  }
-  next();
+  const result = checkOrigin(req.headers.origin, req.headers.host);
+  if (result === 'ok') return next();
+  res.status(403).json({ error: CSRF_ERROR_MESSAGES[result] });
 });
 
 // Persists sessions to disk so the family isn't logged out on every

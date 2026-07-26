@@ -52,10 +52,13 @@
       header matching its own Host (no hardcoded domain, no frontend
       changes); Overseerr's server-to-server webhook is explicitly exempted
       since it's already authenticated by its own shared secret
+- [x] Automated test coverage (`npm test`, Node's built-in test runner, zero
+      new dependencies) — unit tests for the pure logic that's needed fixing
+      before: request-availability computation, CSRF origin check, TMDB guid
+      extraction, file-info/discover-item mapping. Deliberately scoped to
+      logic, not live Radarr/Sonarr/Overseerr integration — that's still
+      verified by hand, which has caught more real bugs than fixtures would
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks
       per-user watch position — reuse for a "pick up where you left off" tile)
-- [ ] Automated test coverage — every feature so far has been verified by
-      hand against live Radarr/Sonarr/Overseerr data over SSH, which won't
-      scale as the admin surface keeps growing
