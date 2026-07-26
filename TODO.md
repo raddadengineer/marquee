@@ -30,10 +30,10 @@
 - [x] Download Queue gains owner-only Pause/Resume/Remove
 - [x] Admin Stack panel — Wanted/Missing (release search reused from
       issues), Import Issues (stuck/failed Radarr/Sonarr queue items, with
-      Remove), Prowlarr indexer health
+      Remove), Prowlarr indexer health, Disk space (Radarr/Sonarr diskspace
+      API, deduped to actual physical volumes)
 
 ## Ideas
-- [ ] Disk space (Sonarr/Radarr diskspace API)
 - [ ] Kid-safe mode
 - [ ] Plex Watchlist integration
 - [ ] Audiobookshelf/Mylar3 integration
