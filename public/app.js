@@ -324,12 +324,51 @@ async function loadDownloads() {
           </div>
           <div class="bar"><div class="bar-fill" style="width:${d.progress}%"></div></div>
         </div>
+        ${isOwner ? `
+          <div class="pending-actions">
+            <button class="dl-action-btn pill-btn" data-id="${escapeHtml(d.id)}" data-type="${d.type}" data-action="${d.state === 'paused' ? 'resume' : 'pause'}">
+              <span class="state-dot"></span><span class="btn-label">${d.state === 'paused' ? 'Resume' : 'Pause'}</span>
+            </button>
+            <button class="dl-remove-btn pill-btn" data-id="${escapeHtml(d.id)}" data-type="${d.type}">
+              <span class="state-dot danger"></span><span class="btn-label">Remove</span>
+            </button>
+          </div>
+        ` : ''}
       </div>
     `).join('');
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not reach download clients.</p>';
   }
 }
+
+document.getElementById('downloads-body').addEventListener('click', async e => {
+  const removeBtn = e.target.closest('.dl-remove-btn');
+  if (removeBtn) {
+    if (!confirm('Remove this download and delete any downloaded files?')) return;
+    removeBtn.disabled = true;
+    removeBtn.querySelector('.btn-label').textContent = '…';
+    try {
+      await api(`/api/downloads/queue/${removeBtn.dataset.type}/${removeBtn.dataset.id}`, { method: 'DELETE' });
+      removeBtn.closest('.dl-row').remove();
+    } catch (err) {
+      removeBtn.disabled = false;
+      removeBtn.querySelector('.btn-label').textContent = 'Remove';
+    }
+    return;
+  }
+  const actionBtn = e.target.closest('.dl-action-btn');
+  if (!actionBtn) return;
+  const action = actionBtn.dataset.action;
+  actionBtn.disabled = true;
+  actionBtn.querySelector('.btn-label').textContent = '…';
+  try {
+    await api(`/api/downloads/queue/${actionBtn.dataset.type}/${actionBtn.dataset.id}/${action}`, { method: 'POST' });
+    loadDownloads(); // refetch so the row reflects the real new state
+  } catch (err) {
+    actionBtn.disabled = false;
+    actionBtn.querySelector('.btn-label').textContent = action === 'pause' ? 'Pause' : 'Resume';
+  }
+});
 
 // ---------- Top of the Month ----------
 async function loadTopOfMonth() {
