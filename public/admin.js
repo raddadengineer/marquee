@@ -20,6 +20,8 @@
   setInterval(loadPendingRequests, 30000);
   loadAdminIssues();
   setInterval(loadAdminIssues, 30000);
+  loadWanted();
+  setInterval(loadWanted, 60000);
 })();
 
 document.getElementById('admin-logout-btn').addEventListener('click', async () => {
@@ -244,4 +246,39 @@ async function openReleaseModal(ctx) {
 
 document.getElementById('close-release-modal-btn').addEventListener('click', () => {
   document.getElementById('release-modal').classList.add('hidden');
+});
+
+// ---------- Stack: Wanted / Missing ----------
+// Monitored movies/episodes that have actually been released but Radarr/
+// Sonarr never got a file for — reuses the same release-search modal as
+// issues above, since the shape (mediaType/tmdbId or tvdbId+season+episode)
+// is identical.
+let wantedResults = [];
+async function loadWanted() {
+  const body = document.getElementById('wanted-body');
+  try {
+    wantedResults = await api('/api/owner/wanted');
+    if (!wantedResults.length) { body.innerHTML = '<p class="empty-state">Nothing missing.</p>'; return; }
+    body.innerHTML = wantedResults.map((r, idx) => `
+      <div class="pending-row" data-idx="${idx}">
+        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+        <div class="result-info">
+          <div class="result-title">${escapeHtml(r.title)}${r.season ? ` — S${r.season}E${r.episode}` : ''}</div>
+          <div class="pending-requester">Released ${formatDate(r.date)}</div>
+        </div>
+        <div class="pending-actions">
+          <button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    body.innerHTML = '<p class="empty-state">Could not load wanted/missing.</p>';
+  }
+}
+
+document.getElementById('wanted-body').addEventListener('click', e => {
+  const btn = e.target.closest('.search-release-btn');
+  if (!btn) return;
+  const idx = Number(btn.closest('.pending-row').dataset.idx);
+  openReleaseModal(wantedResults[idx]);
 });
