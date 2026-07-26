@@ -415,13 +415,24 @@ body {
 .info-layout { display: flex; gap: 1.5rem; padding: 1.5rem; max-height: 78vh; overflow-y: auto; }
 .info-poster { width: 150px; flex-shrink: 0; border-radius: 12px; object-fit: cover; aspect-ratio: 2/3; background: #E2E6EC; box-shadow: 0 16px 32px -14px rgba(20,25,35,0.4); }
 /* Reserves permanent clearance under .info-close (absolutely positioned over
-   the top-right corner) — on a narrow screen the poster's fixed width leaves
-   little room for this column, so the CH.NN badge (first thing in the body)
-   was reaching far enough right to sit underneath the close button. */
+   the top-right corner) so the CH.NN badge (first thing in the body) never
+   sits underneath it. */
 .info-body { min-width: 0; padding-right: 1.75rem; }
 .info-body h3 { font-family: var(--display); font-size: 1.3rem; font-weight: 600; margin: 0.6rem 0 0.3rem; }
 .info-meta { color: var(--muted); font-family: var(--mono); font-size: 0.78rem; margin: 0 0 0.85rem; }
 .info-overview { font-size: 0.9rem; line-height: 1.55; color: #2b3140; margin: 0; }
+
+/* On a real phone width, the 150px poster + gap left too little room for the
+   text column even with the padding-right reservation above — the CH.NN
+   badge was wrapping onto two lines instead. Stacking poster-then-text
+   gives the column the full card width, and the close button ends up
+   floating over the poster's top-right corner instead of competing with
+   text for space — a normal, non-colliding pattern. */
+@media (max-width: 480px) {
+  .info-layout { flex-direction: column; }
+  .info-poster { width: 140px; margin: 0 auto 0.5rem; }
+  .info-body { padding-right: 0; }
+}
 .info-stream {
   margin: 0.9rem 0 0; padding-top: 0.75rem; border-top: 1px solid rgba(20,25,35,0.1);
   display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.75rem;
