@@ -124,6 +124,7 @@ async function loadNotice() {
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
+  if (!confirm('Sign out?')) return;
   await api('/api/auth/logout', { method: 'POST' });
   location.reload();
 });
