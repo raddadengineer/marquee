@@ -610,9 +610,16 @@ body {
 .settings-input-full:focus { outline: none; border-color: var(--teal); }
 .settings-input-full:disabled { opacity: 0.5; cursor: not-allowed; }
 .settings-field-block-desc { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+/* Cancel and the primary action (Save Changes / OK) share the same shape and
+   size — Cancel keeps its own lighter fill/border, just resized/reshaped to
+   match rather than sitting next to it as a small pill. Applies everywhere
+   this row is used: the settings edit popup and the confirm dialog. */
 .settings-edit-actions { display: flex; gap: 0.6rem; margin-top: 0.5rem; }
-.settings-edit-actions .pill-btn { flex: 0 0 auto; }
-.settings-edit-actions .btn-primary { flex: 1; }
+.settings-edit-actions .pill-btn,
+.settings-edit-actions .btn-primary {
+  flex: 1; border-radius: 10px; padding: 0.85rem 1rem;
+  font-size: 0.95rem; font-weight: 600; justify-content: center;
+}
 
 /* Confirm dialog — replaces the browser's native confirm() so it matches the
    rest of the app instead of a plain unstyled OS dialog. */
