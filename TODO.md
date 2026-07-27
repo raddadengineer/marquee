@@ -107,6 +107,16 @@
       common cases (Hardware/Network/Software Issue) plus a just-for-fun row
       (Touch Grass, Watched Everything, Skynet Wisdom) — still fully
       editable before posting, not sent as-is
+- [x] **Security fix**: every signed-in family member was incorrectly
+      getting isOwner:true (full admin access — Settings, Force Import,
+      deleting downloads, everyone's requests). The owner check matched any
+      Plex token that could merely *see* this server in its own resources
+      list, which includes ordinary shared users, not just the actual
+      owner — Plex's own `owned` field on each resource is what actually
+      distinguishes the two, and the code never checked it. Confirmed live
+      against 6 real family accounts, all showing isOwner:true; fixed and
+      force-cleared all 25 active sessions so everyone re-authenticates
+      under the corrected check
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks
