@@ -68,6 +68,21 @@ router.post('/queue/:type/:id/resume', requireAuth, requireOwner, async (req, re
   }
 });
 
+// Torrents only — SABnzbd/usenet has no equivalent "bypass queue limits and
+// retry" concept. Different from Resume: a torrent sitting queued/stalled
+// behind qBittorrent's own max-active-downloads limit won't budge from a
+// plain resume, since it still respects that limit — force start doesn't.
+router.post('/queue/torrent/:id/force', requireAuth, requireOwner, async (req, res) => {
+  if (!ID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid item' });
+  try {
+    await qbittorrent.forceStartTorrent(req.params.id);
+    res.json({ status: 'forced' });
+  } catch (err) {
+    console.error('downloads force-start error:', err.message);
+    res.status(502).json({ error: 'Could not force start item' });
+  }
+});
+
 // qBittorrent only — SABnzbd/usenet has no seeding concept. Absent entirely
 // (not an error) when qBittorrent isn't configured for this deployment.
 router.get('/seeding', requireAuth, requireOwner, async (req, res) => {

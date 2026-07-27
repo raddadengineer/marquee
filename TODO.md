@@ -130,6 +130,19 @@
       cleanly instead of spamming errors when it's not configured; and a
       cycling backdrop banner behind the dashboard header, sourced from
       Overseerr's trending/discover feed with a top-of-month poster fallback
+- [x] QBITTORRENT_API_KEY wired into the Settings qBittorrent edit form
+      (was backend-only before) — also surfaced and fixed a real bug in the
+      process: Settings save silently dropped any field not already a line
+      in .env, since a deployment's .env can predate a field being added to
+      the service registry. applyUpdates now appends missing keys as new
+      lines instead of ignoring them. Verified live: switched the real
+      deployment from username/password to API-key auth successfully
+- [x] Force Start button (torrents only) next to Pause/Resume in Download
+      Issues — bypasses qBittorrent's own queue limits and retries even
+      after repeated errors, unlike a plain Resume which still respects
+      those limits and won't budge a torrent stuck behind them. Verified
+      live against two real stalled torrents: state changed from stalledDL
+      to forcedDL (force_start:true) in qBittorrent itself after the click
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks

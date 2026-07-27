@@ -539,6 +539,11 @@ async function loadDownloadIssues() {
           <button class="dl-action-btn pill-btn" data-action="${d.state === 'paused' ? 'resume' : 'pause'}">
             <span class="state-dot"></span><span class="btn-label">${d.state === 'paused' ? 'Resume' : 'Pause'}</span>
           </button>
+          ${d.type === 'torrent' ? `
+            <button class="dl-action-btn pill-btn" data-action="force" title="Bypasses qBittorrent's own queue limits and retries even after errors — different from Resume, which still respects them">
+              <span class="state-dot"></span><span class="btn-label">Force</span>
+            </button>
+          ` : ''}
           <button class="dl-remove-btn pill-btn">
             <span class="state-dot danger"></span><span class="btn-label">Remove</span>
           </button>
@@ -575,6 +580,7 @@ document.getElementById('download-issues-body').addEventListener('click', async 
   const actionBtn = e.target.closest('.dl-action-btn');
   if (!actionBtn) return;
   const action = actionBtn.dataset.action;
+  const ACTION_LABELS = { pause: 'Pause', resume: 'Resume', force: 'Force' };
   row.querySelectorAll('button').forEach(b => b.disabled = true);
   actionBtn.querySelector('.btn-label').textContent = '…';
   try {
@@ -582,7 +588,7 @@ document.getElementById('download-issues-body').addEventListener('click', async 
     loadDownloadIssues(); // refetch so the row reflects the real new state
   } catch (err) {
     row.querySelectorAll('button').forEach(b => b.disabled = false);
-    actionBtn.querySelector('.btn-label').textContent = action === 'pause' ? 'Pause' : 'Resume';
+    actionBtn.querySelector('.btn-label').textContent = ACTION_LABELS[action] || action;
   }
 });
 
