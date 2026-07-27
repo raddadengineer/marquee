@@ -96,6 +96,14 @@
       main admin page into their own Settings tabs (alongside Services),
       loaded lazily on first view instead of always-on background polling.
       Family panel keeps Pending Requests + Open Issues
+- [x] Notice Board — Settings tab lets the owner schedule a persistent
+      dashboard announcement (e.g. "down Monday night for maintenance") with
+      an optional start/end window; shows as a broadcast-style banner above
+      the panel grid for every signed-in family member, not a toast that
+      disappears after a few seconds. Single current notice, not a list.
+      Verified live: posting, a future-scheduled notice correctly staying
+      hidden from the family view until its start time, and clearing all
+      confirmed against the real deployment
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks

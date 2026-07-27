@@ -83,6 +83,7 @@ app.use('/api/watchlist', require('./routes/watchlist'));
 app.use('/api/downloads', require('./routes/downloads'));
 app.use('/api/owner', require('./routes/owner'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/notice', require('./routes/notice'));
 app.use('/api/prowlarr', require('./routes/prowlarr'));
 
 // index.html carries a {{SITE_NAME}} placeholder so this same image can show a generic

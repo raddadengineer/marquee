@@ -155,6 +155,7 @@
       <button id="tab-settings-services-btn" class="modal-tab pill-btn active"><span class="state-dot"></span>Services</button>
       <button id="tab-settings-status-btn" class="modal-tab pill-btn"><span class="state-dot"></span>System Status</button>
       <button id="tab-settings-signins-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Recent Sign-ins</button>
+      <button id="tab-settings-notice-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Notice Board</button>
     </div>
 
     <div id="settings-services-tab" class="settings-body">
@@ -176,6 +177,30 @@
 
     <div id="settings-signins-tab" class="settings-body hidden">
       <div id="admin-logins-body"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="settings-notice-tab" class="settings-body hidden">
+      <p id="notice-status-text" class="discover-label"></p>
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Message</label>
+        <textarea id="notice-message-input" class="settings-input-full" rows="3" maxlength="500"
+          placeholder="e.g. Server will be down Monday night for routine maintenance."></textarea>
+      </div>
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Starts showing</label>
+        <input id="notice-starts-input" class="settings-input-full" type="datetime-local">
+        <p class="settings-field-block-desc">Leave blank to show as soon as you post it.</p>
+      </div>
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Stops showing</label>
+        <input id="notice-ends-input" class="settings-input-full" type="datetime-local">
+        <p class="settings-field-block-desc">Leave blank to show until you clear it.</p>
+      </div>
+      <div class="settings-edit-actions">
+        <button id="notice-clear-btn" class="pill-btn hidden">Clear Notice</button>
+        <button id="notice-save-btn" class="btn-primary">Post Notice</button>
+      </div>
+      <p id="notice-save-status" class="settings-status hidden"></p>
     </div>
   </div>
 </div>

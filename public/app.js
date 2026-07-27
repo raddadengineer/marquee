@@ -84,6 +84,7 @@ function showDashboard(owner) {
   signinScreen.classList.add('hidden');
   dashboardScreen.classList.remove('hidden');
   setHeroDate();
+  loadNotice();
   connectNowPlayingStream();
   loadRecentlyWatched();
   loadTopOfMonth();
@@ -101,6 +102,25 @@ function setHeroDate() {
   const now = new Date();
   document.getElementById('date-num').textContent = now.getDate();
   document.getElementById('date-txt').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short' });
+}
+
+// ---------- Notice board ----------
+// Owner-scheduled announcement (e.g. planned maintenance) — checked once on
+// load, not pushed live; the scheduling use case (e.g. "starts Monday 9am")
+// doesn't need it to appear mid-session without a refresh.
+async function loadNotice() {
+  const banner = document.getElementById('notice-banner');
+  try {
+    const notice = await api('/api/notice');
+    if (notice) {
+      document.getElementById('notice-banner-text').textContent = notice.message;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  } catch (e) {
+    banner.classList.add('hidden');
+  }
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {

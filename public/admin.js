@@ -813,7 +813,8 @@ document.getElementById('open-settings-btn').addEventListener('click', openSetti
 const settingsTabs = [
   { btn: document.getElementById('tab-settings-services-btn'), pane: document.getElementById('settings-services-tab') },
   { btn: document.getElementById('tab-settings-status-btn'), pane: document.getElementById('settings-status-tab') },
-  { btn: document.getElementById('tab-settings-signins-btn'), pane: document.getElementById('settings-signins-tab') }
+  { btn: document.getElementById('tab-settings-signins-btn'), pane: document.getElementById('settings-signins-tab') },
+  { btn: document.getElementById('tab-settings-notice-btn'), pane: document.getElementById('settings-notice-tab') }
 ];
 function activateSettingsTab(btn) {
   for (const t of settingsTabs) {
@@ -824,6 +825,7 @@ function activateSettingsTab(btn) {
 }
 let ownerStatusLoaded = false;
 let adminLoginsLoaded = false;
+let noticeSettingsLoaded = false;
 
 settingsTabs[0].btn.addEventListener('click', () => activateSettingsTab(settingsTabs[0].btn));
 settingsTabs[1].btn.addEventListener('click', () => {
@@ -833,6 +835,10 @@ settingsTabs[1].btn.addEventListener('click', () => {
 settingsTabs[2].btn.addEventListener('click', () => {
   activateSettingsTab(settingsTabs[2].btn);
   if (!adminLoginsLoaded) { adminLoginsLoaded = true; loadAdminLogins(); }
+});
+settingsTabs[3].btn.addEventListener('click', () => {
+  activateSettingsTab(settingsTabs[3].btn);
+  if (!noticeSettingsLoaded) { noticeSettingsLoaded = true; loadNoticeSettings(); }
 });
 
 async function openSettings() {
@@ -1018,3 +1024,95 @@ async function waitForSettingsRestart() {
   }
   document.getElementById('settings-edit-status').textContent = 'Taking longer than expected — try reloading the page manually.';
 }
+
+// ---------- Settings: Notice Board ----------
+// A single scheduled announcement shown on the family dashboard (e.g.
+// "down Monday night for maintenance") — not a list of notices, one row,
+// overwritten each time it's posted. No restart needed here (unlike the
+// rest of Settings): this reads/writes its own small db, not .env.
+function toDatetimeLocal(epochMs) {
+  if (!epochMs) return '';
+  const d = new Date(epochMs);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function formatNoticeDateTime(epochMs) {
+  return new Date(epochMs).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+async function loadNoticeSettings() {
+  const statusEl = document.getElementById('notice-status-text');
+  const clearBtn = document.getElementById('notice-clear-btn');
+  const messageInput = document.getElementById('notice-message-input');
+  const startsInput = document.getElementById('notice-starts-input');
+  const endsInput = document.getElementById('notice-ends-input');
+  try {
+    const current = await api('/api/notice/admin');
+    if (!current) {
+      statusEl.textContent = 'Nothing posted right now.';
+      messageInput.value = '';
+      startsInput.value = '';
+      endsInput.value = '';
+      clearBtn.classList.add('hidden');
+      return;
+    }
+    const statusText = {
+      active: 'Currently showing on the dashboard.',
+      scheduled: `Scheduled to start ${formatNoticeDateTime(current.startsAt)}.`,
+      expired: `Expired ${formatNoticeDateTime(current.endsAt)} — no longer showing.`
+    };
+    statusEl.textContent = statusText[current.status] || '';
+    messageInput.value = current.message || '';
+    startsInput.value = toDatetimeLocal(current.startsAt);
+    endsInput.value = toDatetimeLocal(current.endsAt);
+    clearBtn.classList.remove('hidden');
+  } catch (e) {
+    statusEl.textContent = 'Could not load notice.';
+  }
+}
+
+document.getElementById('notice-save-btn').addEventListener('click', async () => {
+  const message = document.getElementById('notice-message-input').value.trim();
+  const startsValue = document.getElementById('notice-starts-input').value;
+  const endsValue = document.getElementById('notice-ends-input').value;
+  const statusMsg = document.getElementById('notice-save-status');
+  statusMsg.className = 'settings-status';
+  statusMsg.textContent = '';
+
+  if (!message) {
+    statusMsg.className = 'settings-status error';
+    statusMsg.textContent = 'Message is required.';
+    return;
+  }
+  // Resolved from the browser's own local time here, not sent as a bare
+  // date-time string — the server would otherwise parse that against its
+  // own timezone instead of whatever the owner actually picked.
+  const startsAt = startsValue ? new Date(startsValue).getTime() : null;
+  const endsAt = endsValue ? new Date(endsValue).getTime() : null;
+
+  const btn = document.getElementById('notice-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Posting…';
+  try {
+    await api('/api/notice', { method: 'POST', body: JSON.stringify({ message, startsAt, endsAt }) });
+    statusMsg.className = 'settings-status ok';
+    statusMsg.textContent = 'Saved.';
+    loadNoticeSettings();
+  } catch (e) {
+    statusMsg.className = 'settings-status error';
+    statusMsg.textContent = e.message || 'Could not save notice.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Post Notice';
+  }
+});
+
+document.getElementById('notice-clear-btn').addEventListener('click', async () => {
+  if (!confirm('Clear the current notice? Family members will stop seeing it immediately.')) return;
+  try {
+    await api('/api/notice', { method: 'DELETE' });
+    loadNoticeSettings();
+  } catch (e) {
+    document.getElementById('notice-save-status').textContent = 'Could not clear notice.';
+  }
+});
