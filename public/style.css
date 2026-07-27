@@ -86,6 +86,27 @@ body {
   box-shadow: 0 24px 48px -28px rgba(20,25,35,0.4);
 }
 .hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 78% 25%, rgba(255,255,255,0.15), transparent 55%); }
+/* Cycling backdrop banner — sits behind .hero-top/.hero-mid (those have
+   z-index:1, this doesn't, so it always stays underneath regardless of DOM
+   order) using .hero's own dark gradient as the base/fallback until the
+   first image loads. The ::after scrim keeps header text readable over
+   whatever photo is showing, same idea as .hero's own gradient. */
+.hero-bg { position: absolute; inset: 0; overflow: hidden; }
+.hero-bg-slide {
+  position: absolute; inset: 0; background-size: cover; background-position: center;
+  opacity: 0; transition: opacity 1.4s ease;
+}
+.hero-bg-slide.active { opacity: 1; }
+.hero-bg::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(120deg, rgba(30,37,49,0.9), rgba(20,25,35,0.78) 65%);
+}
+.hero-featured-tag {
+  font-family: var(--mono); font-size: 0.68rem; color: rgba(255,255,255,0.75);
+  margin-top: 0.3rem; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.hero-featured-tag:hover { color: #fff; }
 .hero-top { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; position: relative; z-index: 1; color: #fff; }
 .logo { font-family: var(--display); font-weight: 700; font-size: 1.4rem; color: #fff; }
 .logo-tag { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.04em; color: rgba(255,255,255,0.55); text-transform: uppercase; margin-top: 1px; }

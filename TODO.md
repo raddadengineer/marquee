@@ -121,6 +121,15 @@
       unstyled OS popup) everywhere it was used: sign-out on both pages,
       removing a download, removing/blocklisting an import-queue item,
       clearing the notice, and the Settings restart warning
+- [x] Adopted three ideas from a community fork's PR, adapted cleanly to the
+      current codebase rather than merged wholesale (the fork was 44 commits
+      behind and its qBittorrent state-mapping would have reintroduced an
+      already-fixed bug): qBittorrent API-key auth (>= 5.2.0/WebAPI >= 2.14.1,
+      confirmed against the real v5.2.3 deployment) alongside the existing
+      username/password flow unchanged; Now Playing skips Tautulli polling
+      cleanly instead of spamming errors when it's not configured; and a
+      cycling backdrop banner behind the dashboard header, sourced from
+      Overseerr's trending/discover feed with a top-of-month poster fallback
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks

@@ -85,6 +85,7 @@ function showDashboard(owner) {
   dashboardScreen.classList.remove('hidden');
   setHeroDate();
   loadNotice();
+  loadHeroBanners();
   connectNowPlayingStream();
   loadRecentlyWatched();
   loadTopOfMonth();
@@ -121,6 +122,81 @@ async function loadNotice() {
   } catch (e) {
     banner.classList.add('hidden');
   }
+}
+
+// ---------- Hero backdrop banner ----------
+// Cycles through wide backdrop images behind the header, sourced from
+// Overseerr's trending/discover feed (same data already used by the request
+// modal's default view). Falls back to this month's top movie/TV/anime
+// posters if Overseerr isn't configured/reachable or has nothing with a
+// backdrop — a portrait poster in a landscape slot isn't ideal, but it's a
+// reasonable degrade rather than showing nothing.
+let heroBanners = [];
+let heroBannerIndex = 0;
+let heroBannerTimer = null;
+
+async function loadHeroBanners() {
+  let items = [];
+  try {
+    const discover = await api('/api/overseerr/discover');
+    items = discover.filter(i => i.backdrop);
+  } catch (e) { /* Overseerr not configured/reachable — fall through below */ }
+
+  if (!items.length) {
+    try {
+      const top = await api('/api/tautulli/top-of-month');
+      items = [top.movie?.[0], top.tv?.[0], top.anime?.[0]]
+        .filter(i => i && i.thumb)
+        .map(i => ({ backdrop: i.thumb, title: i.title }));
+    } catch (e) { /* nothing to show — banner just stays off */ }
+  }
+
+  heroBanners = items;
+  heroBannerIndex = 0;
+  if (heroBannerTimer) { clearInterval(heroBannerTimer); heroBannerTimer = null; }
+  if (!heroBanners.length) return;
+
+  showHeroBanner(heroBanners[0]);
+  if (heroBanners.length > 1) {
+    heroBannerTimer = setInterval(() => {
+      heroBannerIndex = (heroBannerIndex + 1) % heroBanners.length;
+      showHeroBanner(heroBanners[heroBannerIndex]);
+    }, 12000);
+  }
+}
+
+function showHeroBanner(item) {
+  const slideA = document.querySelector('#hero-bg .slide-a');
+  const slideB = document.querySelector('#hero-bg .slide-b');
+  if (!slideA || !slideB || !item) return;
+  const active = slideA.classList.contains('active') ? slideA : slideB;
+  const inactive = active === slideA ? slideB : slideA;
+  // Preload before swapping — crossfading onto a half-downloaded image looks
+  // broken, and the currently-visible slide just stays put until this loads.
+  const img = new Image();
+  img.onload = () => {
+    inactive.style.backgroundImage = `url("${item.backdrop}")`;
+    active.classList.remove('active');
+    inactive.classList.add('active');
+  };
+  img.src = item.backdrop;
+
+  const tag = document.getElementById('hero-featured-tag');
+  const label = item.year ? `${item.title} (${item.year})` : item.title;
+  tag.textContent = `FEATURED · ${label}`;
+  tag.classList.remove('hidden');
+  // Only Overseerr-sourced items (which carry an id) have enough data for the
+  // info modal's Request flow — the top-of-month fallback doesn't, so its
+  // tag is just a label, not a click target.
+  tag.onclick = item.id ? () => openInfo({
+    poster: item.poster || item.backdrop,
+    title: item.title,
+    badge: item.mediaType === 'tv' ? 'SERIES' : 'MOVIE',
+    meta: item.year || '',
+    overview: item.overview,
+    request: item
+  }) : null;
+  tag.style.cursor = item.id ? 'pointer' : 'default';
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
