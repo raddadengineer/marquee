@@ -117,6 +117,10 @@
       against 6 real family accounts, all showing isOwner:true; fixed and
       force-cleared all 25 active sessions so everyone re-authenticates
       under the corrected check
+- [x] Themed confirm dialog — replaces the browser's native confirm() (an
+      unstyled OS popup) everywhere it was used: sign-out on both pages,
+      removing a download, removing/blocklisting an import-queue item,
+      clearing the notice, and the Settings restart warning
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks

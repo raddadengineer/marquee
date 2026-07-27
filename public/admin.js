@@ -34,7 +34,7 @@
 })();
 
 document.getElementById('admin-logout-btn').addEventListener('click', async () => {
-  if (!confirm('Sign out?')) return;
+  if (!await confirmDialog('Sign out?')) return;
   await api('/api/auth/logout', { method: 'POST' });
   location.href = '/';
 });
@@ -556,7 +556,7 @@ document.getElementById('download-issues-body').addEventListener('click', async 
 
   const removeBtn = e.target.closest('.dl-remove-btn');
   if (removeBtn) {
-    if (!confirm('Remove this download and delete any downloaded files?')) return;
+    if (!await confirmDialog('Remove this download and delete any downloaded files?')) return;
     row.querySelectorAll('button').forEach(b => b.disabled = true);
     removeBtn.querySelector('.btn-label').textContent = '…';
     try {
@@ -692,7 +692,7 @@ document.getElementById('import-issues-body').addEventListener('click', async e 
 
   const btn = e.target.closest('.remove-queue-btn');
   if (!btn) return;
-  if (!confirm('Remove this from the queue and blocklist the release?')) return;
+  if (!await confirmDialog('Remove this from the queue and blocklist the release?')) return;
   const row = btn.closest('.pending-row');
   row.querySelectorAll('button').forEach(b => b.disabled = true);
   btn.querySelector('.btn-label').textContent = '…';
@@ -987,7 +987,7 @@ document.getElementById('settings-edit-save-btn').addEventListener('click', asyn
   const warning = changingSessionSecret
     ? 'This includes SESSION_SECRET — saving will sign out every family member, including you. The app will restart and this page will reload automatically. Continue?'
     : 'Save these changes? The app will restart (a few seconds of downtime) and this page will reload automatically.';
-  if (!confirm(warning)) return;
+  if (!await confirmDialog(warning)) return;
 
   const saveBtn = document.getElementById('settings-edit-save-btn');
   const status = document.getElementById('settings-edit-status');
@@ -1126,7 +1126,7 @@ document.getElementById('notice-save-btn').addEventListener('click', async () =>
 });
 
 document.getElementById('notice-clear-btn').addEventListener('click', async () => {
-  if (!confirm('Clear the current notice? Family members will stop seeing it immediately.')) return;
+  if (!await confirmDialog('Clear the current notice? Family members will stop seeing it immediately.')) return;
   try {
     await api('/api/notice', { method: 'DELETE' });
     loadNoticeSettings();

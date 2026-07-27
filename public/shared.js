@@ -46,6 +46,32 @@ function titleCase(str) {
   return str.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
 }
 
+// Replaces the browser's native confirm() (a plain unstyled OS dialog) with
+// the app's own themed modal — same Promise<boolean> shape, so every call
+// site just becomes `if (!await confirmDialog('...')) return;`. Relies on
+// both pages having a #confirm-modal with #confirm-message/#confirm-cancel-btn/
+// #confirm-ok-btn (see index.html/admin.html).
+function confirmDialog(message) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirm-modal');
+    const okBtn = document.getElementById('confirm-ok-btn');
+    const cancelBtn = document.getElementById('confirm-cancel-btn');
+    document.getElementById('confirm-message').textContent = message;
+    modal.classList.remove('hidden');
+
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
 // Clicking a modal's backdrop closes it, sitewide — applies automatically to
 // every ".modal" on the page (both index.html and admin.html), no per-modal
 // wiring needed. Triggers the modal's own close button rather than just

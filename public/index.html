@@ -255,6 +255,17 @@
 
 <div id="toast-container"></div>
 
+<!-- CONFIRM DIALOG (replaces the browser's native confirm() — see shared.js's confirmDialog) -->
+<div id="confirm-modal" class="modal hidden">
+  <div class="modal-card confirm-card">
+    <p id="confirm-message"></p>
+    <div class="settings-edit-actions">
+      <button id="confirm-cancel-btn" class="pill-btn">Cancel</button>
+      <button id="confirm-ok-btn" class="btn-primary">OK</button>
+    </div>
+  </div>
+</div>
+
 <script src="shared.js?v={{ASSET_VERSION}}"></script>
 <script src="app.js?v={{ASSET_VERSION}}"></script>
 </body>
