@@ -1040,6 +1040,23 @@ function formatNoticeDateTime(epochMs) {
   return new Date(epochMs).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+// Quick-start templates — fill the textarea, still fully editable before
+// posting, not sent as-is. Second row is just for fun, not a real outage
+// category — kept visually separate from the three above.
+const NOTICE_PRESETS = {
+  hardware: "We're experiencing a hardware issue with the server. Some features may be temporarily unavailable while we look into it.",
+  network: "We're experiencing network connectivity issues. Streaming and requests may be slow or unavailable until this is resolved.",
+  software: "We're troubleshooting a software issue affecting the server. Some features may not work correctly until this is resolved.",
+  touchGrass: "Go touch grass. The couch isn't going anywhere.",
+  watchedEverything: "Pretty sure you've watched everything at this point. Maybe try a walk?",
+  skynetWisdom: "Skynet has determined you need sunlight. This is not a request."
+};
+document.querySelectorAll('[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('notice-message-input').value = NOTICE_PRESETS[btn.dataset.preset];
+  });
+});
+
 async function loadNoticeSettings() {
   const statusEl = document.getElementById('notice-status-text');
   const clearBtn = document.getElementById('notice-clear-btn');

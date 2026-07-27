@@ -600,6 +600,8 @@ body {
 /* Settings edit popup — one field per row, full-width input, stacked */
 .settings-field-block + .settings-field-block { margin-top: 0.9rem; }
 .settings-field-block-label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.35rem; }
+.notice-preset-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
+.notice-preset-row-fun { opacity: 0.75; }
 .settings-input-full {
   width: 100%; padding: 0.6rem 0.75rem; background: rgba(255,255,255,0.7);
   border: 1px solid rgba(20,25,35,0.1); border-radius: 8px; color: var(--text);

@@ -103,7 +103,10 @@
       disappears after a few seconds. Single current notice, not a list.
       Verified live: posting, a future-scheduled notice correctly staying
       hidden from the family view until its start time, and clearing all
-      confirmed against the real deployment
+      confirmed against the real deployment. Quick-fill preset buttons for
+      common cases (Hardware/Network/Software Issue) plus a just-for-fun row
+      (Touch Grass, Watched Everything, Skynet Wisdom) — still fully
+      editable before posting, not sent as-is
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks
