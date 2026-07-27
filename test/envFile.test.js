@@ -68,7 +68,16 @@ test('applyUpdates quotes a value that contains whitespace, but leaves simple va
   assert.match(unchanged, /SITE_NAME=Marquee2\n/);
 });
 
-test('applyUpdates ignores keys not present in the original file', () => {
-  const result = applyUpdates(SAMPLE, { NOT_A_REAL_KEY: 'x' });
-  assert.equal(result, SAMPLE);
+test('applyUpdates appends a key that is not yet present in the file', () => {
+  // e.g. QBITTORRENT_API_KEY being set for the first time on a deployment
+  // whose .env predates that field existing at all.
+  const result = applyUpdates(SAMPLE, { QBITTORRENT_API_KEY: 'abc123' });
+  assert.match(result, /QBITTORRENT_API_KEY=abc123$/);
+  assert.match(result, /PORT=4000/); // existing content still untouched
+});
+
+test('applyUpdates appends new keys and updates existing ones in the same call', () => {
+  const result = applyUpdates(SAMPLE, { SITE_NAME: 'MyPlexHub', NEW_KEY: 'value' });
+  assert.match(result, /SITE_NAME=MyPlexHub/);
+  assert.match(result, /NEW_KEY=value$/);
 });

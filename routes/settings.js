@@ -90,13 +90,18 @@ router.post('/', requireAuth, requireOwner, (req, res) => {
   }
 
   const text = fs.readFileSync(ENV_PATH, 'utf8');
+  // A key can be written here if it's either already a line in .env, or one
+  // of the fields SERVICES declares as valid — the latter matters when a
+  // service registry field is being set for the first time on a deployment
+  // whose .env predates that field being added (e.g. QBITTORRENT_API_KEY on
+  // a .env that only ever had USERNAME/PASSWORD). Either way this is still
+  // a fixed, developer-controlled set, never arbitrary client-supplied keys.
   const knownKeys = new Set(parseFields(text).map(f => f.key));
+  const allowedKeys = new Set([...knownKeys, ...SERVICE_KEYS]);
 
   const updates = {};
   for (const [key, value] of Object.entries(changes)) {
-    // Only existing keys can be changed here — no creating new ones through
-    // this form, and never the infrastructure-critical read-only ones.
-    if (!knownKeys.has(key) || READONLY_KEYS.has(key) || typeof value !== 'string') continue;
+    if (!allowedKeys.has(key) || READONLY_KEYS.has(key) || typeof value !== 'string') continue;
     updates[key] = value;
   }
   if (!Object.keys(updates).length) {
