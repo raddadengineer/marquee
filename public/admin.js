@@ -13,9 +13,8 @@
     return;
   }
 
-  loadOwnerStatus();
-  setInterval(loadOwnerStatus, 15000);
-  loadAdminLogins();
+  // System Status and Recent Sign-ins now live under Settings tabs (see
+  // below) — loaded lazily on first view rather than eagerly here.
   loadPendingRequests();
   setInterval(loadPendingRequests, 30000);
   loadAdminIssues();
@@ -806,8 +805,39 @@ async function loadIndexers() {
 
 document.getElementById('open-settings-btn').addEventListener('click', openSettings);
 
+// Services / System Status / Recent Sign-ins — same tabbed-modal pattern as
+// the family dashboard's request modal. The latter two were previously
+// always-visible panels on the admin page itself; moved here and made lazy
+// (loaded on first view, not eagerly on page load or on an interval) since
+// Settings is a "check occasionally" surface, not a live dashboard.
+const settingsTabs = [
+  { btn: document.getElementById('tab-settings-services-btn'), pane: document.getElementById('settings-services-tab') },
+  { btn: document.getElementById('tab-settings-status-btn'), pane: document.getElementById('settings-status-tab') },
+  { btn: document.getElementById('tab-settings-signins-btn'), pane: document.getElementById('settings-signins-tab') }
+];
+function activateSettingsTab(btn) {
+  for (const t of settingsTabs) {
+    const isActive = t.btn === btn;
+    t.btn.classList.toggle('active', isActive);
+    t.pane.classList.toggle('hidden', !isActive);
+  }
+}
+let ownerStatusLoaded = false;
+let adminLoginsLoaded = false;
+
+settingsTabs[0].btn.addEventListener('click', () => activateSettingsTab(settingsTabs[0].btn));
+settingsTabs[1].btn.addEventListener('click', () => {
+  activateSettingsTab(settingsTabs[1].btn);
+  if (!ownerStatusLoaded) { ownerStatusLoaded = true; loadOwnerStatus(); }
+});
+settingsTabs[2].btn.addEventListener('click', () => {
+  activateSettingsTab(settingsTabs[2].btn);
+  if (!adminLoginsLoaded) { adminLoginsLoaded = true; loadAdminLogins(); }
+});
+
 async function openSettings() {
   document.getElementById('settings-modal').classList.remove('hidden');
+  activateSettingsTab(settingsTabs[0].btn);
   loadServiceHealth();
 }
 

@@ -92,6 +92,10 @@
       reloads itself. Verified live end-to-end: all 9 services report real
       status/latency/version, write+restart+session persistence all
       confirmed against the real deployment
+- [x] Moved System Status (Uptime Kuma + UPS) and Recent Sign-ins off the
+      main admin page into their own Settings tabs (alongside Services),
+      loaded lazily on first view instead of always-on background polling.
+      Family panel keeps Pending Requests + Open Issues
 
 ## Ideas
 - [ ] Continue Watching / resume progress panel (Tautulli already tracks

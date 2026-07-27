@@ -37,15 +37,8 @@
   <!-- BENTO GRID -->
   <div class="bento">
 
-    <section class="card span4" id="panel-owner">
-      <div class="card-label"><span class="chan">CH.08</span> System Status</div>
-      <div id="owner-body"><p class="empty-state">Loading…</p></div>
-    </section>
-
     <section class="card span4" id="panel-admin">
       <div class="card-label"><span class="chan">CH.09</span> Family</div>
-      <h4 class="admin-subhead">Recent sign-ins</h4>
-      <div id="admin-logins-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Pending requests</h4>
       <div id="admin-requests-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Open issues</h4>
@@ -157,7 +150,14 @@
       <h3>Settings</h3>
       <button id="close-settings-btn" class="pill-btn pill-btn-icon">&#10005;</button>
     </div>
-    <div class="settings-body">
+
+    <div class="modal-tabs">
+      <button id="tab-settings-services-btn" class="modal-tab pill-btn active"><span class="state-dot"></span>Services</button>
+      <button id="tab-settings-status-btn" class="modal-tab pill-btn"><span class="state-dot"></span>System Status</button>
+      <button id="tab-settings-signins-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Recent Sign-ins</button>
+    </div>
+
+    <div id="settings-services-tab" class="settings-body">
       <div class="settings-section-row">
         <h4 class="admin-subhead">Integrated Service Health &amp; Latency</h4>
         <button id="run-health-check-btn" class="pill-btn"><span class="state-dot"></span>Run Health Check</button>
@@ -168,6 +168,14 @@
         <h4 class="admin-subhead">Server &amp; Deployment Configuration</h4>
         <button id="edit-deployment-btn" class="pill-btn"><span class="state-dot"></span>Edit Deployment Settings</button>
       </div>
+    </div>
+
+    <div id="settings-status-tab" class="settings-body hidden">
+      <div id="owner-body"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="settings-signins-tab" class="settings-body hidden">
+      <div id="admin-logins-body"><p class="empty-state">Loading…</p></div>
     </div>
   </div>
 </div>
