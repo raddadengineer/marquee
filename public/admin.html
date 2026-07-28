@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{SITE_NAME}} — Admin</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts.css?v={{ASSET_VERSION}}">
 <link rel="stylesheet" href="style.css?v={{ASSET_VERSION}}">
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
@@ -15,7 +14,7 @@
 <div class="frame">
 
   <!-- HERO MASTHEAD -->
-  <div class="hero">
+  <div class="hero hero-admin">
     <div class="hero-top">
       <div>
         <div class="logo">{{SITE_NAME}}</div>
@@ -32,6 +31,10 @@
         <button id="admin-logout-btn" class="icon-btn" aria-label="Sign out">&#8594;</button>
       </div>
     </div>
+    <div class="hero-diskspace">
+      <h4 class="hero-diskspace-label">Disk Space</h4>
+      <div id="diskspace-body"><p class="empty-state">Loading…</p></div>
+    </div>
   </div>
 
   <!-- BENTO GRID -->
@@ -39,6 +42,8 @@
 
     <section class="card span4" id="panel-admin">
       <div class="card-label"><span class="chan">CH.09</span> Family</div>
+      <h4 class="admin-subhead">Wanted / Missing</h4>
+      <div id="wanted-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Pending requests</h4>
       <div id="admin-requests-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Open issues</h4>
@@ -50,14 +55,10 @@
       <h4 class="admin-subhead">Search Library</h4>
       <input id="library-search-input" type="text" placeholder="Search your Radarr/Sonarr library…" autocomplete="off">
       <div id="library-search-body"><p class="empty-state">Type to search.</p></div>
-      <h4 class="admin-subhead">Disk Space</h4>
-      <div id="diskspace-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Seeding</h4>
       <div id="seeding-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Download Issues</h4>
       <div id="download-issues-body"><p class="empty-state">Loading…</p></div>
-      <h4 class="admin-subhead">Wanted / Missing</h4>
-      <div id="wanted-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Import Issues</h4>
       <div id="import-issues-body"><p class="empty-state">Loading…</p></div>
       <h4 class="admin-subhead">Indexers</h4>
@@ -65,6 +66,7 @@
     </section>
 
   </div>
+  <div class="app-footer">{{SITE_NAME}} v{{APP_VERSION}} &middot; &copy; {{COPYRIGHT_YEAR}}</div>
 </div>
 
 <!-- RELEASE SEARCH MODAL -->
@@ -83,7 +85,7 @@
   <div class="modal-card info-card">
     <button id="close-file-info-btn" class="pill-btn pill-btn-icon info-close">&#10005;</button>
     <div class="info-layout">
-      <img id="file-info-poster" class="info-poster" src="" onerror="this.style.visibility='hidden'">
+      <img id="file-info-poster" class="info-poster" src="" loading="lazy" onerror="this.style.visibility='hidden'">
       <div class="info-body">
         <span id="file-info-badge" class="chan"></span>
         <h3 id="file-info-title"></h3>
@@ -127,7 +129,7 @@
   <div class="modal-card info-card">
     <button id="close-wanted-info-btn" class="pill-btn pill-btn-icon info-close">&#10005;</button>
     <div class="info-layout">
-      <img id="wanted-info-poster" class="info-poster" src="" onerror="this.style.visibility='hidden'">
+      <img id="wanted-info-poster" class="info-poster" src="" loading="lazy" onerror="this.style.visibility='hidden'">
       <div class="info-body">
         <span id="wanted-info-badge" class="chan"></span>
         <h3 id="wanted-info-title"></h3>

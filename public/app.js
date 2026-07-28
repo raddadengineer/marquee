@@ -97,6 +97,54 @@ function showDashboard(owner) {
   // Everything owner-only (sign-ins, pending requests, issues, system status,
   // stack management) lives on its own page now instead of crowding this one.
   document.getElementById('admin-link-btn').classList.toggle('hidden', !isOwner);
+  initNotifyToggle();
+}
+
+// ---------- Push notifications ----------
+// "Available now" pushes (see lib/pushNotify.js) reach this device even
+// without a tab open, unlike the SSE toast they mirror. Button stays hidden
+// entirely if this deployment has no VAPID key configured, or the browser
+// doesn't support Push at all — same graceful-absence pattern as every other
+// optional integration in this app.
+async function initNotifyToggle() {
+  const btn = document.getElementById('notify-toggle-btn');
+  if (!window.VAPID_PUBLIC_KEY || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  btn.classList.remove('hidden');
+
+  const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+  btn.classList.toggle('active', !!existing);
+
+  btn.addEventListener('click', async () => {
+    const reg = await navigator.serviceWorker.ready;
+    const current = await reg.pushManager.getSubscription();
+    if (current) {
+      await current.unsubscribe();
+      await api('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: current.endpoint }) });
+      btn.classList.remove('active');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      alert('Notifications are blocked for this site in your browser settings.');
+      return;
+    }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(window.VAPID_PUBLIC_KEY)
+    });
+    await api('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+    btn.classList.add('active');
+  });
+}
+
+// Web Push's applicationServerKey needs a Uint8Array — VAPID public keys are
+// handed out base64url-encoded, this is the standard conversion (same as
+// MDN's own push notification guide).
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
 
 function setHeroDate() {
@@ -152,14 +200,19 @@ async function loadHeroBanners() {
   }
 
   heroBanners = items;
-  heroBannerIndex = 0;
+  heroBannerIndex = Math.floor(Math.random() * heroBanners.length);
   if (heroBannerTimer) { clearInterval(heroBannerTimer); heroBannerTimer = null; }
   if (!heroBanners.length) return;
 
-  showHeroBanner(heroBanners[0]);
+  showHeroBanner(heroBanners[heroBannerIndex]);
   if (heroBanners.length > 1) {
     heroBannerTimer = setInterval(() => {
-      heroBannerIndex = (heroBannerIndex + 1) % heroBanners.length;
+      // Random, but never repeat the slide currently on screen.
+      let next;
+      do {
+        next = Math.floor(Math.random() * heroBanners.length);
+      } while (next === heroBannerIndex);
+      heroBannerIndex = next;
       showHeroBanner(heroBanners[heroBannerIndex]);
     }, 12000);
   }
@@ -229,7 +282,7 @@ function showAvailableToast({ title, poster }) {
   const toast = document.createElement('div');
   toast.className = 'toast';
   toast.innerHTML = `
-    <img class="toast-poster" src="${poster || ''}" onerror="this.style.visibility='hidden'">
+    <img class="toast-poster" src="${poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
     <div class="toast-body">
       <div class="toast-eyebrow">Available now</div>
       <div class="toast-title">${escapeHtml(title || 'A request')}</div>
@@ -259,7 +312,7 @@ function renderNowPlaying({ sessions, totalBandwidthKbps }) {
     ? '<p class="empty-state">Nothing playing right now.</p>'
     : sessions.map((s, idx) => `
       <div class="now-row" data-idx="${idx}" data-session-key="${s.sessionKey}">
-        <img class="thumb" src="${s.thumb || ''}" onerror="this.style.visibility='hidden'">
+        <img class="thumb" src="${s.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div style="flex:1; min-width:0;">
           <div class="now-title">${escapeHtml(s.title)}</div>
           <div class="now-meta"><span class="${dotClass(s.state === 'paused')}"></span>${escapeHtml(s.user || '')} · ${s.quality || ''} · <span class="state-word">${s.state}</span></div>
@@ -308,7 +361,7 @@ function renderRecentlyWatched() {
   if (!items.length) { body.innerHTML = '<p class="empty-state">Nothing watched recently.</p>'; return; }
   body.innerHTML = items.map((i, idx) => `
     <div class="now-row" data-idx="${idx}">
-      <img class="thumb" src="${i.thumb || ''}" onerror="this.style.visibility='hidden'">
+      <img class="thumb" src="${i.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
       <div style="flex:1; min-width:0;">
         <div class="now-title">${escapeHtml(i.title)}</div>
         <div class="now-meta">
@@ -350,7 +403,7 @@ async function loadRecentlyAdded() {
         ${s.items.slice(0, cap).map((i, idx) => `
           <div class="poster-card" data-cat="${s.key}" data-idx="${idx}">
             <div class="poster-frame">
-              <img class="poster-img" src="${i.thumb || ''}" onerror="this.style.visibility='hidden'">
+              <img class="poster-img" src="${i.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
               <span class="poster-badge">${timeAgo(i.addedAt)}</span>
               <div class="poster-overlay"><span class="poster-overlay-text">${escapeHtml(i.title)}</span></div>
             </div>
@@ -373,7 +426,7 @@ async function loadAiringToday() {
     body.innerHTML = items.map((i, idx) => `
       <div class="poster-card" data-idx="${idx}">
         <div class="poster-frame">
-          <img class="poster-img" src="${i.poster || ''}" onerror="this.style.visibility='hidden'">
+          <img class="poster-img" src="${i.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
           <span class="poster-badge">${i.episode}</span>
           <div class="poster-overlay"><span class="poster-overlay-text">${escapeHtml(i.series)}</span></div>
         </div>
@@ -395,7 +448,7 @@ async function loadUpcoming() {
     body.innerHTML = items.map((i, idx) => `
       <div class="poster-card" data-idx="${idx}">
         <div class="poster-frame">
-          <img class="poster-img" src="${i.poster || ''}" onerror="this.style.visibility='hidden'">
+          <img class="poster-img" src="${i.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
           <span class="poster-badge">${formatDate(i.releaseDate)}</span>
           <div class="poster-overlay"><span class="poster-overlay-text">${escapeHtml(i.title)}</span></div>
         </div>
@@ -418,7 +471,7 @@ async function loadDownloads() {
     const items = await api('/api/downloads/queue');
     if (!items.length) { body.innerHTML = '<p class="empty-state">Nothing downloading.</p>'; return; }
     body.innerHTML = items.map(d => `
-      <div class="dl-row">
+      <div class="dl-row${d.type === 'torrent' ? ' dl-row-clickable' : ''}"${d.type === 'torrent' ? ` data-hash="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name)}"` : ''}>
         <div class="dl-row-body">
           <div class="now-title">${escapeHtml(d.name)}</div>
           <div class="now-meta">
@@ -427,12 +480,80 @@ async function loadDownloads() {
           </div>
           <div class="bar"><div class="bar-fill" style="width:${d.progress}%"></div></div>
         </div>
+        ${isOwner && d.type === 'torrent' ? `
+          <button class="dl-remove-btn pill-btn">
+            <span class="state-dot danger"></span><span class="btn-label">Remove</span>
+          </button>
+        ` : ''}
       </div>
     `).join('');
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not reach download clients.</p>';
   }
 }
+
+// Delegated so it keeps working across loadDownloads' re-renders every 5s
+// instead of needing listeners re-attached each poll.
+document.getElementById('downloads-body').addEventListener('click', async e => {
+  const removeBtn = e.target.closest('.dl-remove-btn');
+  if (removeBtn) {
+    const row = removeBtn.closest('.dl-row');
+    if (!await confirmDialog('Remove this download and delete any downloaded files?')) return;
+    row.querySelectorAll('button').forEach(b => b.disabled = true);
+    removeBtn.querySelector('.btn-label').textContent = '…';
+    try {
+      await api(`/api/downloads/queue/torrent/${encodeURIComponent(row.dataset.hash)}`, { method: 'DELETE' });
+      row.remove();
+      if (!document.getElementById('downloads-body').children.length) {
+        document.getElementById('downloads-body').innerHTML = '<p class="empty-state">Nothing downloading.</p>';
+      }
+    } catch (err) {
+      row.querySelectorAll('button').forEach(b => b.disabled = false);
+      removeBtn.querySelector('.btn-label').textContent = 'Remove';
+    }
+    return;
+  }
+
+  const row = e.target.closest('.dl-row-clickable');
+  if (row) openTorrentDetails(row.dataset.hash, row.dataset.name);
+});
+
+const torrentModal = document.getElementById('torrent-modal');
+
+async function openTorrentDetails(hash, name) {
+  torrentModal.classList.remove('hidden');
+  const statsEl = document.getElementById('torrent-details-stats');
+  const filesEl = document.getElementById('torrent-details-files');
+  document.getElementById('torrent-details-title').textContent = name || '';
+  statsEl.innerHTML = '';
+  filesEl.innerHTML = '<p class="empty-state">Loading…</p>';
+  try {
+    const d = await api(`/api/downloads/queue/torrent/${encodeURIComponent(hash)}/details`);
+    const rows = [
+      ['Seeds', `${d.seeds} (${d.seedsTotal} total)`],
+      ['Peers', `${d.peers} (${d.peersTotal} total)`],
+      ['Connections', `${d.connections}${d.connectionsLimit > 0 ? ' / ' + d.connectionsLimit : ''}`],
+      ['Speed', `↓ ${formatSpeed(d.downloadSpeedKbps)} · ↑ ${formatSpeed(d.uploadSpeedKbps)}`],
+      ['ETA', d.etaSeconds != null ? formatEta(d.etaSeconds) : 'Unknown'],
+      ['Ratio', d.ratio != null ? d.ratio.toFixed(2) : 'Unknown'],
+      ['Size', formatBytes(d.sizeBytes)],
+      ['Save Path', d.savePath || 'Unknown']
+    ];
+    statsEl.innerHTML = rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd>`).join('');
+    filesEl.innerHTML = d.files.map(f => `
+      <div class="torrent-file-row">
+        <div class="now-title">${escapeHtml(f.name)}</div>
+        <div class="now-meta">${formatBytes(f.sizeBytes)} · ${f.progress}%</div>
+        <div class="bar"><div class="bar-fill" style="width:${f.progress}%"></div></div>
+      </div>
+    `).join('');
+  } catch (e) {
+    filesEl.innerHTML = '<p class="empty-state">Could not load torrent details.</p>';
+  }
+}
+
+document.getElementById('close-torrent-btn').addEventListener('click', () => torrentModal.classList.add('hidden'));
+torrentModal.addEventListener('click', e => { if (e.target === torrentModal) torrentModal.classList.add('hidden'); });
 
 // ---------- Top of the Month ----------
 async function loadTopOfMonth() {
@@ -456,7 +577,7 @@ function renderTopMonthTile(label, items, isUser) {
   if (!items || !items.length) {
     return `
       <div class="top-month-tile ${isUser ? 'user' : ''}">
-        <div class="top-month-frame"><img class="top-month-img" src="" onerror="this.style.visibility='hidden'"></div>
+        <div class="top-month-frame"><img class="top-month-img" src="" loading="lazy" onerror="this.style.visibility='hidden'"></div>
         <div class="top-month-label">${label}</div>
         <div class="empty-state">No data yet</div>
       </div>
@@ -473,7 +594,7 @@ function renderTopMonthTile(label, items, isUser) {
   return `
     <div class="top-month-tile ${isUser ? 'user' : ''}">
       <span class="top-month-medal">🥇</span>
-      <div class="top-month-frame"><img class="top-month-img" src="${(isUser ? first.avatar : first.thumb) || ''}" onerror="this.style.visibility='hidden'"></div>
+      <div class="top-month-frame"><img class="top-month-img" src="${(isUser ? first.avatar : first.thumb) || ''}" loading="lazy" onerror="this.style.visibility='hidden'"></div>
       <div class="top-month-label">${label}</div>
       <div class="top-month-title">${escapeHtml(first.name || first.title)}</div>
       <div class="top-month-plays">${first.plays} play${first.plays === 1 ? '' : 's'}</div>
@@ -557,11 +678,11 @@ async function loadMyRequests() {
     const statusText = { available: 'Available', downloading: 'Downloading', approved: 'Approved', pending: 'Pending Approval', declined: 'Declined' };
     listEl.innerHTML = results.map(r => `
       <div class="my-request-row">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
           <div class="my-request-status ${r.availability}">
-            <span class="status-dot"></span>${statusText[r.availability] || r.availability}
+            <span class="status-dot"></span>${statusText[r.availability] || r.availability}${r.availability === 'downloading' && r.etaSeconds != null ? ' · ' + formatEta(r.etaSeconds) : ''}
           </div>
         </div>
       </div>
@@ -583,7 +704,7 @@ function renderSearchResults(results, emptyMessage, containerId = 'search-result
   if (!results.length) { resultsEl.innerHTML = `<p class="empty-state">${emptyMessage}</p>`; return; }
   resultsEl.innerHTML = results.map((r, idx) => `
     <div class="result-item" data-idx="${idx}">
-      <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+      <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
       <div class="result-info">
         <div class="result-title">${escapeHtml(r.title)}</div>
         <div class="result-year">${r.year || ''} · ${r.mediaType === 'tv' ? 'Series' : 'Movie'}</div>
@@ -930,7 +1051,7 @@ document.getElementById('report-search-input').addEventListener('input', e => {
       const results = await api(`/api/plex/search?q=${encodeURIComponent(q)}`);
       resultsEl.innerHTML = results.map(r => `
         <div class="result-item" data-ratingkey="${r.ratingKey}" data-title="${escapeHtml(r.title)}" data-type="${r.type}" data-thumb="${r.thumb || ''}" data-year="${r.year || ''}">
-          <img class="result-poster" src="${r.thumb || ''}" onerror="this.style.visibility='hidden'">
+          <img class="result-poster" src="${r.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
           <div class="result-info">
             <div class="result-title">${escapeHtml(r.title)}</div>
             <div class="result-year">${r.year || ''} · ${r.type === 'show' ? 'Series' : 'Movie'}</div>
@@ -966,7 +1087,7 @@ async function loadReportBrowse(ratingKey, title) {
     const items = await api(`/api/plex/children/${ratingKey}`);
     listEl.innerHTML = items.map(i => `
       <div class="browse-row" data-ratingkey="${i.ratingKey}" data-title="${escapeHtml(i.title)}" data-type="${i.type}" data-thumb="${i.thumb || ''}">
-        <img class="browse-row-thumb" src="${i.thumb || ''}" onerror="this.style.visibility='hidden'">
+        <img class="browse-row-thumb" src="${i.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="browse-row-name">${i.type === 'episode' ? `${i.index}. ${escapeHtml(i.title)}` : escapeHtml(i.title)}</div>
       </div>
     `).join('');

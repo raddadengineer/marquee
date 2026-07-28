@@ -14,6 +14,8 @@ async function fetchAll() {
   return [...torrents, ...usenet];
 }
 
+const ID_RE = /^[a-zA-Z0-9_]+$/;
+
 router.get('/queue', requireAuth, async (req, res) => {
   // Actively downloading only — this answers "what's coming in right now" for
   // everyone, not "manage my whole torrent/usenet client." Anything stuck
@@ -26,6 +28,20 @@ router.get('/queue', requireAuth, async (req, res) => {
   res.json(items);
 });
 
+// Torrents only — qBittorrent exposes seeds/peers/connections/per-file
+// progress via its own properties+files endpoints; SABnzbd has no equivalent.
+// Same visibility as /queue itself (everyone, not owner-only) since this is
+// just more detail on an item already shown there, not a control action.
+router.get('/queue/torrent/:id/details', requireAuth, async (req, res) => {
+  if (!ID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid item' });
+  try {
+    res.json(await qbittorrent.getTorrentDetails(req.params.id));
+  } catch (err) {
+    console.error('downloads torrent details error:', err.message);
+    res.status(502).json({ error: 'Could not reach qBittorrent' });
+  }
+});
+
 router.get('/queue/attention', requireAuth, requireOwner, async (req, res) => {
   // Not downloading and not seeding/complete — i.e. actually stuck or failed,
   // the things worth an owner's Pause/Resume/Remove action. Excludes
@@ -35,8 +51,6 @@ router.get('/queue/attention', requireAuth, requireOwner, async (req, res) => {
   items.sort((a, b) => a.name.localeCompare(b.name));
   res.json(items);
 });
-
-const ID_RE = /^[a-zA-Z0-9_]+$/;
 
 function serviceFor(type) {
   if (type === 'torrent') return qbittorrent;

@@ -5,6 +5,7 @@ const requireOwner = require('./requireOwner');
 const overseerrSession = require('../lib/overseerrSession');
 const rateLimit = require('../lib/rateLimit');
 const sse = require('../lib/sse');
+const pushNotify = require('../lib/pushNotify');
 const tautulliMedia = require('../lib/tautulliMedia');
 const { adminClient, mapDiscoverItem } = require('../lib/overseerrClient');
 const downloadQueueIds = require('../lib/downloadQueueIds');
@@ -174,7 +175,12 @@ router.get('/requests/mine', requireAuth, async (req, res) => {
         ? queued.movieIds.has(r.media?.externalServiceId)
         : queued.seriesIds.has(r.media?.externalServiceId);
       const availability = computeAvailability({ requestStatus: r.status, mediaStatus: r.media?.status, inQueue });
-      return { title, poster, mediaType, availability, requestedAt: r.createdAt };
+      const etaSeconds = inQueue
+        ? (mediaType === 'movie'
+          ? queued.movieEta.get(r.media?.externalServiceId)
+          : queued.seriesEta.get(r.media?.externalServiceId)) ?? null
+        : null;
+      return { title, poster, mediaType, availability, etaSeconds, requestedAt: r.createdAt };
     }));
 
     res.json(results);
@@ -352,6 +358,11 @@ router.post('/webhook', (req, res) => {
   const { notification_type, subject, image } = req.body;
   if (notification_type === 'MEDIA_AVAILABLE') {
     sse.broadcast('media-available', { title: subject, poster: image });
+    // Same audience as the SSE toast above — reaches anyone subscribed even
+    // if they don't have the dashboard open in a tab right now, which is the
+    // whole point of push over SSE.
+    pushNotify.notifyAll({ title: 'Now available', body: subject, icon: image })
+      .catch(err => console.error('push notify error:', err.message));
   }
 });
 

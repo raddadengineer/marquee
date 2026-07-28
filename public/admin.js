@@ -15,6 +15,8 @@
 
   // System Status and Recent Sign-ins now live under Settings tabs (see
   // below) — loaded lazily on first view rather than eagerly here.
+  loadWanted();
+  setInterval(loadWanted, 60000);
   loadPendingRequests();
   setInterval(loadPendingRequests, 30000);
   loadAdminIssues();
@@ -25,8 +27,6 @@
   setInterval(loadSeeding, 60000);
   loadDownloadIssues();
   setInterval(loadDownloadIssues, 15000);
-  loadWanted();
-  setInterval(loadWanted, 60000);
   loadImportIssues();
   setInterval(loadImportIssues, 30000);
   loadIndexers();
@@ -85,7 +85,7 @@ async function loadAdminLogins() {
     const logins = await api('/api/owner/logins');
     body.innerHTML = !logins.length ? '<p class="empty-state">No sign-ins recorded yet.</p>' : logins.map(l => `
       <div class="login-row">
-        <img class="login-avatar" src="${l.thumb || ''}" onerror="this.style.visibility='hidden'">
+        <img class="login-avatar" src="${l.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div>
           <div class="login-name">${escapeHtml(l.username)}${l.isOwner ? ' · Owner' : ''}</div>
           <div class="login-time">${timeAgo(l.at)}</div>
@@ -104,11 +104,11 @@ async function loadPendingRequests() {
     if (!results.length) { body.innerHTML = '<p class="empty-state">Nothing pending.</p>'; return; }
     body.innerHTML = results.map(r => `
       <div class="pending-row" data-id="${r.id}">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
           <div class="pending-requester">
-            <img src="${r.requestedByAvatar || ''}" onerror="this.style.visibility='hidden'">
+            <img src="${r.requestedByAvatar || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
             ${escapeHtml(r.requestedBy)} · ${timeAgo(r.requestedAt)}
           </div>
         </div>
@@ -151,11 +151,11 @@ async function loadAdminIssues() {
       <div class="pending-row" data-id="${r.id}" data-title="${escapeHtml(r.title || 'Unknown title')}"
            data-media-type="${r.mediaType || ''}" data-tmdb-id="${r.tmdbId || ''}" data-tvdb-id="${r.tvdbId || ''}"
            data-season="${r.season || ''}" data-episode="${r.episode || ''}" data-poster="${r.poster || ''}">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div class="result-title">${escapeHtml(r.title || 'Unknown title')}${r.season ? ` — S${r.season}E${r.episode}` : ''}</div>
           <div class="pending-requester">
-            <img src="${r.reportedByAvatar || ''}" onerror="this.style.visibility='hidden'">
+            <img src="${r.reportedByAvatar || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
             ${escapeHtml(r.reportedBy)} · ${r.issueType} · ${timeAgo(r.reportedAt)}
           </div>
           ${r.message ? `<div class="issue-message">${escapeHtml(r.message)}</div>` : ''}
@@ -319,7 +319,7 @@ document.getElementById('library-search-input').addEventListener('input', e => {
       if (!librarySearchResults.length) { body.innerHTML = '<p class="empty-state">No matches in your library.</p>'; return; }
       body.innerHTML = librarySearchResults.map((r, idx) => `
         <div class="pending-row" data-idx="${idx}">
-          <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+          <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
           <div class="result-info">
             <div class="result-title">${escapeHtml(r.title)}${r.year ? ` (${r.year})` : ''}</div>
             <div class="pending-requester">${r.mediaType === 'tv' ? 'Series' : 'Movie'}</div>
@@ -459,26 +459,38 @@ document.getElementById('close-library-browse-btn').addEventListener('click', ()
 });
 
 // ---------- Stack: Disk Space ----------
-// One row per actual physical volume (Radarr/Sonarr both report every mount
-// point they see, deduped server-side) — reuses the same .bar/.bar-fill
-// component already used for UPS battery charge and download progress.
+// One row per actual physical volume (deduped server-side, see lib/diskspace.js)
+// — a per-volume donut gauge (.disk-donut) instead of a linear bar, same
+// amber/danger color semantics as the state-dot next to it.
+function diskDonut(usedPercent, danger) {
+  return `
+    <svg class="disk-donut" viewBox="0 0 36 36">
+      <circle class="disk-donut-track" cx="18" cy="18" r="15.5" pathLength="100"></circle>
+      <circle class="disk-donut-fill${danger ? ' danger' : ''}" cx="18" cy="18" r="15.5" pathLength="100" stroke-dasharray="${usedPercent} 100"></circle>
+    </svg>
+  `;
+}
+
 async function loadDiskSpace() {
   const body = document.getElementById('diskspace-body');
   try {
     const disks = await api('/api/owner/diskspace');
     if (!disks.length) { body.innerHTML = '<p class="empty-state">No disk info available.</p>'; return; }
-    body.innerHTML = disks.map(d => `
+    body.innerHTML = disks.map(d => {
+      const danger = d.usedPercent >= 90;
+      return `
       <div class="dl-row">
+        ${diskDonut(d.usedPercent, danger)}
         <div class="dl-row-body">
           <div class="now-title">${escapeHtml(d.path)}</div>
           <div class="now-meta">
-            <span class="state-dot ${d.usedPercent >= 90 ? 'danger' : ''}"></span>
+            <span class="state-dot ${danger ? 'danger' : ''}"></span>
             ${formatBytes(d.freeBytes)} free of ${formatBytes(d.totalBytes)} · ${d.usedPercent}% used
           </div>
-          <div class="bar"><div class="bar-fill" style="width:${d.usedPercent}%"></div></div>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not load disk space.</p>';
   }
@@ -592,11 +604,15 @@ document.getElementById('download-issues-body').addEventListener('click', async 
   }
 });
 
-// ---------- Stack: Wanted / Missing ----------
+// ---------- Family: Wanted / Missing ----------
 // Monitored movies/episodes that have actually been released but Radarr/
 // Sonarr never got a file for — reuses the same release-search modal as
 // issues above, since the shape (mediaType/tmdbId or tvdbId+season+episode)
-// is identical.
+// is identical. Sorted most-overdue-first server-side, with `stuck` flagging
+// releases out long enough to be worth calling out rather than a separate
+// list — moved to the top of the page (was Stack) since that's the point of
+// flagging it at all: something that prompts the owner to notice, not a
+// second place they'd have to remember to check.
 let wantedResults = [];
 async function loadWanted() {
   const body = document.getElementById('wanted-body');
@@ -605,10 +621,12 @@ async function loadWanted() {
     if (!wantedResults.length) { body.innerHTML = '<p class="empty-state">Nothing missing.</p>'; return; }
     body.innerHTML = wantedResults.map((r, idx) => `
       <div class="pending-row" data-idx="${idx}">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div class="result-title">${escapeHtml(r.title)}${r.season ? ` — S${r.season}E${r.episode}` : ''}</div>
-          <div class="pending-requester">Released ${formatDate(r.date)}</div>
+          <div class="pending-requester">
+            ${r.stuck ? '<span class="state-dot danger"></span>' : ''}Released ${formatDate(r.date)}${r.stuck ? ` · ${r.daysSinceRelease}d overdue` : ''}
+          </div>
         </div>
         <div class="pending-actions">
           <button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>
@@ -672,7 +690,7 @@ async function loadImportIssues() {
     if (!results.length) { body.innerHTML = '<p class="empty-state">No import issues.</p>'; return; }
     body.innerHTML = results.map(r => `
       <div class="pending-row" data-id="${r.id}" data-service="${r.service}" data-download-id="${r.downloadId || ''}" data-title="${escapeHtml(r.title || 'Unknown title')}">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
           <div class="issue-message">${escapeHtml(r.reason)}</div>

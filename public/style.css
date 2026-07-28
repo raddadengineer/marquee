@@ -111,6 +111,21 @@ body {
 .logo { font-family: var(--display); font-weight: 700; font-size: 1.4rem; color: #fff; }
 .logo-tag { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.04em; color: rgba(255,255,255,0.55); text-transform: uppercase; margin-top: 1px; }
 .hero-icons { display: flex; gap: 0.6rem; align-items: center; }
+/* Admin hero masthead's Disk Space section — dark background, so the shared
+   .now-title/.now-meta/.disk-donut-track tokens (tuned for light cards)
+   need overriding here; .disk-donut-fill's amber/danger stay as-is, already
+   visible on dark. */
+.hero-diskspace { position: relative; z-index: 1; padding: 0 1.5rem 1.25rem; }
+.hero-diskspace-label { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.04em; color: rgba(255,255,255,0.55); text-transform: uppercase; margin: 0 0 0.6rem; font-weight: 500; }
+.hero-diskspace .now-title { color: #fff; }
+.hero-diskspace .now-meta { color: rgba(255,255,255,0.7); }
+.hero-diskspace .disk-donut-track { stroke: rgba(255,255,255,0.18); }
+.hero-diskspace .empty-state { color: rgba(255,255,255,0.7); }
+/* Unlike the family dashboard's hero, admin's has no cycling banner image
+   needing a fixed box — height:220px + overflow:hidden was clipping the
+   Disk Space section whenever volumes wrapped to more rows than fit
+   (confirmed live on mobile: 3 volumes stacked single-column, 3rd cut off). */
+.hero-admin { height: auto; }
 .icon-btn {
   width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.18);
   border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -118,10 +133,15 @@ body {
   cursor: pointer; line-height: 1; text-decoration: none;
 }
 .icon-btn:hover { background: rgba(255,255,255,0.28); }
+/* Notification bell, once subscribed — same amber the rest of the app uses
+   for "on"/active state (download progress bars, disk gauges). */
+.icon-btn.active { background: var(--amber); border-color: var(--amber); }
 /* An SVG child (admin-link-btn) defaults to inline, which leaves a few px of
    baseline whitespace under it even inside a flex-centered parent — block
    avoids that so it centers exactly like the text-glyph icon buttons do. */
 .icon-btn svg { display: block; }
+
+.app-footer { text-align: center; font-family: var(--mono); font-size: 0.7rem; color: var(--muted); padding: 1.5rem 0 5rem; }
 
 /* Floating request button — mobile only (see the media query below); desktop
    keeps the plain header icon button (.icon-btn above) instead. Styled to match
@@ -190,7 +210,7 @@ body {
 
 /* ---------- Bento grid ---------- */
 .bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.1rem; }
-.span1 { grid-column: span 1; } .span2 { grid-column: span 2; } .span4 { grid-column: span 4; }
+.span2 { grid-column: span 2; } .span4 { grid-column: span 4; }
 
 .card {
   background: var(--card); border: 1px solid var(--card-border); border-radius: 18px; padding: 1.15rem;
@@ -223,6 +243,22 @@ body {
 .bar { height: 5px; background: rgba(20,25,35,0.08); border-radius: 3px; margin-top: 7px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--amber); }
 
+/* Disk Space panel's per-volume gauge — same amber/danger semantics as
+   .bar-fill/.state-dot.danger, just circular instead of linear. pathLength="100"
+   on both circles lets stroke-dasharray take a plain percentage directly,
+   no circumference math needed. */
+.disk-donut { width: 40px; height: 40px; flex-shrink: 0; transform: rotate(-90deg); }
+.disk-donut-track { fill: none; stroke: rgba(20,25,35,0.08); stroke-width: 3.5; }
+.disk-donut-fill { fill: none; stroke: var(--amber); stroke-width: 3.5; stroke-linecap: round; transition: stroke-dasharray 0.3s ease; }
+.disk-donut-fill.danger { stroke: var(--danger); }
+
+/* Volumes side by side instead of stacked — a plain vertical list reads odd
+   for just 2-3 items that aren't really a sequence. Wraps on narrow widths
+   instead of the list-divider look .dl-row uses elsewhere (Download Queue/
+   Issues), which stays untouched since those genuinely are lists. */
+#diskspace-body { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+#diskspace-body .dl-row { flex: 1 1 200px; padding: 0; border-bottom: none; }
+
 /* Recently Watched reuses the Now Playing row markup (.now-row/.thumb/.now-meta),
    minus the progress bar. flex:1 on a flex-column .card fills whatever height the row's tallest
    sibling (Now Playing) naturally wants — grid stretch then matches Now Playing's
@@ -234,6 +270,7 @@ body {
 /* Download queue rows — same shape as Now Playing rows but not clickable */
 .dl-row { display: flex; align-items: center; gap: 0.9rem; padding: 0.65rem 0; border-bottom: 1px solid rgba(20,25,35,0.06); }
 .dl-row:last-child { border-bottom: none; }
+.dl-row-clickable { cursor: pointer; }
 .dl-row-body { flex: 1; min-width: 0; }
 
 /* Top of the Month leaderboard — #1 gets the big medal frame, #2/#3 are compact
@@ -335,8 +372,6 @@ body {
   padding: 0.18rem 0.4rem; border-radius: 5px; background: rgba(255,255,255,0.85); color: #12151A;
 }
 .poster-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); margin-top: 0.4rem; }
-/* Positioning modifier for .bar when it overlays a poster instead of sitting inline */
-.poster-progress { position: absolute; left: 0; right: 0; bottom: 0; margin-top: 0; border-radius: 0; height: 4px; background: rgba(0,0,0,0.35); }
 .subsection-label {
   font-family: var(--display); font-size: 0.85rem; font-weight: 600; color: var(--text);
   margin: 0 0 0.6rem; padding-top: 0.2rem;
@@ -344,7 +379,7 @@ body {
 .subsection-label:not(:first-child) { margin-top: 0.5rem; padding-top: 1rem; border-top: 1px solid rgba(20,25,35,0.06); }
 
 @media (max-width: 900px) {
-  .span1, .span2, .span4 { grid-column: span 4; }
+  .span2, .span4 { grid-column: span 4; }
   .bento { grid-template-columns: 1fr; }
   .frame { padding: 1.25rem; }
   /* Cards stack into one column here, so Now Playing and Recently Watched are no
@@ -472,6 +507,14 @@ body {
 .info-stream.hidden { display: none; }
 .info-stream dt { color: var(--muted); }
 .info-stream dd { margin: 0; color: #2b3140; }
+
+/* Torrent details modal (Download Queue -> click a torrent row) */
+.torrent-details-card { width: min(560px, 92vw); }
+.torrent-details-layout { padding: 1.5rem; max-height: 78vh; overflow-y: auto; }
+.torrent-details-layout h3 { font-family: var(--display); font-size: 1.1rem; font-weight: 600; margin: 0 1.75rem 0.75rem 0; }
+.torrent-files { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid rgba(20,25,35,0.1); }
+.torrent-file-row { padding: 0.4rem 0; }
+.torrent-file-row .now-title { white-space: normal; overflow-wrap: anywhere; }
 
 /* "Available now" toast — pushed via SSE when Overseerr reports a request has
    finished downloading. Stacks above everything, including the request modal,

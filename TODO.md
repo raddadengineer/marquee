@@ -143,7 +143,136 @@
       those limits and won't budge a torrent stuck behind them. Verified
       live against two real stalled torrents: state changed from stalledDL
       to forcedDL (force_start:true) in qBittorrent itself after the click
+- [x] Hero backdrop banner now cycles randomly instead of walking the
+      Overseerr/top-of-month list in a fixed loop — picks a random slide on
+      load and a random next slide each interval, only constrained to never
+      repeat the one currently on screen. Verified the exact selection logic
+      statistically (20k transitions: 0 immediate repeats, ~20% uniform
+      distribution across 5 slides) and deployed live to the real container
+      via `docker cp` with zero downtime/restart
+- [x] My Requests shows an ETA next to "Downloading" (e.g. "Downloading ·
+      45m left"), pulled from Radarr/Sonarr's own queue `timeleft` instead of
+      leaving it a black box between request and the "Available now" toast.
+      For a season pack (multiple episode-level queue records under one
+      seriesId), takes the max across them — not fully available until the
+      slowest one finishes. Added unit tests for the parsing/aggregation
+      logic; verified the restart needed to load the backend change came
+      back healthy with real family sessions re-validating cleanly
+- [x] **Fix**: Settings showed qBittorrent as Unconfigured after switching
+      from username/password to API-key auth — the health check
+      (`checkQbittorrent` in serviceHealth.js) only ever checked for
+      username+password, never the API key, unlike lib/qbittorrent.js's own
+      auth logic which already preferred the key correctly. Now checks for
+      either. Verified against the real deployment: the API-key request
+      succeeds directly (v5.2.3) and the container restart came back clean
+- [x] **Fix**: Prowlarr had no entry in serviceRegistry.js, so PROWLARR_URL/
+      PROWLARR_API_KEY fell into the catch-all Deployment Configuration
+      popup instead of getting their own Settings service card with a real
+      health check — despite Prowlarr already being a first-class
+      integration (indexer health in the admin Stack panel). Added a
+      registry entry and a checkProwlarr health check (Servarr's own
+      /api/v1/system/status). Settings grid is built dynamically from the
+      registry, so no frontend changes needed. Verified against the real
+      deployment: version 2.4.0.5397 returned successfully, restart came
+      back clean
+- [x] Click a torrent in Download Queue for details — seeds/peers (connected
+      + total), connections (vs. limit, "-1" from qBittorrent handled as
+      unlimited rather than shown literally), up/down speed, ratio, ETA,
+      save path, and a per-file list with individual progress bars. Pulled
+      from qBittorrent's own properties+files endpoints (`getTorrentDetails`
+      in lib/qbittorrent.js) via a new owner-agnostic endpoint (same
+      visibility as the queue itself — read-only, no control action).
+      Torrent-only; SABnzbd/usenet rows aren't clickable, no equivalent data
+      available. Added unit tests for the properties+files mapping,
+      including the sentinel/edge cases (100-day "no ETA", -1 "no connection
+      limit"). Verified live end-to-end against a real torrent in the actual
+      queue — correct seeds/peers/size/save path/per-file progress returned
+- [x] Owner-only Remove button on actively-downloading torrents in the main
+      Download Queue panel (previously Remove only existed in the admin-only
+      Download Issues panel, for stuck/paused/errored items — nothing let
+      the owner pull a torrent that's downloading normally but shouldn't be,
+      e.g. wrong release grabbed). Reuses the existing DELETE
+      /queue/torrent/:id endpoint, already owner-gated server-side, so no
+      backend changes needed — just an isOwner-gated button client-side,
+      same confirm-dialog-then-delete-files pattern as Download Issues.
+      Torrent-only, matching the details feature above. Zero-downtime static
+      deploy, verified served live
+- [x] Disk Space moved from the Stack card into the admin hero masthead
+      (previously buried several scrolls down, now the first thing the
+      owner sees) and rendered as a per-volume donut gauge instead of a
+      linear bar — same amber/danger color semantics as before, extracted
+      the dedup-by-capacity logic into lib/diskspace.js. Hero sizes to its
+      content instead of the family dashboard's fixed height (which has no
+      cycling banner to justify it here, and was clipping volumes on mobile)
+- [x] Wanted/Missing moved from Stack to the top of the admin Family card and
+      now proactively flags stuck releases in the same list, instead of a
+      second near-duplicate section (tried that first, merged after
+      noticing the overlap). Every item gets `daysSinceRelease` + a `stuck`
+      flag (lib/stuckRequests.js, >= 3 days out with no file — long enough
+      that it's not just still propagating across indexers) computed
+      server-side; sorted most-overdue-first, stuck ones get a danger dot +
+      "Nd overdue", fresh ones render as before. Same info modal + release
+      search as always. Verified live against the real Radarr/Sonarr queue:
+      17 total wanted/missing, several genuinely stuck for months (one over
+      1000 days)
+- [x] Web Push for "Available now" — reaches subscribed devices even without
+      a tab open, alongside the existing in-app SSE toast (same trigger,
+      Overseerr's MEDIA_AVAILABLE webhook, same audience — every subscribed
+      device, not scoped to who requested it, matching the SSE toast's own
+      broadcast-to-everyone behavior). New bell icon in the header toggles
+      subscribe/unsubscribe (hidden entirely if VAPID isn't configured).
+      Subscriptions persist in their own push.sqlite (survives sign-out,
+      unlike a session) with dead-subscription cleanup on a 404/410 send
+      response. Verified live: web-push loads with real VAPID keys, storage
+      layer's upsert/multi-user/remove all confirmed, image rebuilt clean
+      (new npm dependency) with every earlier feature from this session
+      still intact afterward. Note: iOS Safari only supports Web Push from
+      an installed PWA, not a regular tab — not fixable app-side, WebKit's
+      own restriction
+- [x] **Perf audit, dead code**: removed unused `.span1`/`.poster-progress`
+      CSS rules and an unused `THRESHOLD_DAYS` export (lib/stuckRequests.js);
+      consolidated a byte-identical `parseTimeleft()` duplicated in
+      lib/sabnzbd.js and lib/downloadQueueIds.js into lib/parseTimeleft.js.
+      Verified nothing else references any of it before removing (checked
+      static + dynamic/template-literal usage twice), all 57 tests still
+      pass, live-verified both parseTimeleft call sites against real
+      SABnzbd/Radarr/Sonarr data post-deploy.
+- [x] **Perf audit, images**: added `loading="lazy"` to all 24 `<img>` tags
+      (20 dynamic across app.js/admin.js, 4 static modal placeholders) —
+      defers offscreen poster/thumbnail loads across Recently Added/Top of
+      Month/Airing Today/Upcoming/search results.
+- [x] **Perf audit, fonts**: self-hosted Inter/Space Grotesk/JetBrains Mono
+      instead of a render-blocking Google Fonts `<link>` in both `<head>`s.
+      Discovered Google serves these as variable fonts under the hood — the
+      identical file backs every requested weight per subset (e.g. Inter
+      400/500/600 latin all resolved to one URL) — so only 6 files
+      (latin + latin-ext × 3 families, ~220KB total) were actually needed,
+      not the 16 initially fetched. Dropped cyrillic/greek/vietnamese
+      subsets entirely (irrelevant for this English-language dashboard).
+      Local fonts.css mirrors Google's own @font-face structure exactly
+      (same family/weight/unicode-range, just deduplicated files) for
+      guaranteed pixel-identical rendering. Verified all 6 files serve with
+      correct content-type/size and zero googleapis.com references remain
+      in served HTML; visual spot-check still worth doing since I have no
+      browser to confirm rendering myself.
+- [x] **Perf audit, cache headers**: versioned bundles (app.js/admin.js/
+      shared.js/style.css/fonts.css) switched from `no-cache` to
+      `public, max-age=31536000, immutable` — safe because each gets a fresh
+      `?v=<deploy timestamp>` on every restart, so the response body at any
+      given URL is genuinely permanent. `sw.js` deliberately excluded and
+      stays `no-cache` — it's the one script registered without a `?v=` (see
+      `navigator.serviceWorker.register('sw.js')` in app.js), so long-lived
+      caching would have silently blocked future service-worker updates
+      from ever reaching clients. Fonts extended the same 1-week treatment
+      icons already had (also unversioned, also rarely change). Verified
+      every category live — sw.js/manifest/HTML still no-cache, everything
+      else immutable/1-week as intended.
+- [x] Copyright/version footer on both pages ("{{SITE_NAME}} v{{APP_VERSION}}
+      · © {{COPYRIGHT_YEAR}}") — package.json's version is the single source
+      of truth, year computed once at startup. Bumped 1.0.0 -> 1.1.0 (122
+      commits deep, version had never been bumped once) to reflect tonight's
+      batch as a real minor release rather than silently accumulating forever
+      under the original number. Verified live on both pages, correctly
+      showing this deployment's site name, the new version, and the year
 
 ## Ideas
-- [ ] Continue Watching / resume progress panel (Tautulli already tracks
-      per-user watch position — reuse for a "pick up where you left off" tile)

@@ -85,6 +85,7 @@ app.use('/api/owner', require('./routes/owner'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notice', require('./routes/notice'));
 app.use('/api/prowlarr', require('./routes/prowlarr'));
+app.use('/api/push', require('./routes/push'));
 
 // index.html carries a {{SITE_NAME}} placeholder so this same image can show a generic
 // "Marquee" brand out of the box, or your own (e.g. via SITE_NAME=MyPlexHub in .env).
@@ -98,6 +99,11 @@ const taglinesJson = JSON.stringify(taglines).replace(/</g, '\\u003c');
 // Busting the query string on every process start (i.e. every deploy) instead
 // forces a real cache miss, since it's a URL Cloudflare has never cached before.
 const assetVersion = String(Date.now());
+// Footer branding — package.json's version is the single source of truth
+// (bump it there, not here), year is computed once at startup rather than
+// per-request since this is a long-running process, not a static site build.
+const appVersion = require('./package.json').version;
+const copyrightYear = String(new Date().getFullYear());
 // siteName/taglinesJson/assetVersion are all fixed for the life of the process,
 // so both the disk read and the placeholder substitution are redundant on every
 // request — do each exactly once at startup and just serve the resulting string.
@@ -106,7 +112,13 @@ const assetVersion = String(Date.now());
 const renderedHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8')
   .replaceAll('{{SITE_NAME}}', siteName)
   .replace('{{TAGLINES_JSON}}', taglinesJson)
-  .replaceAll('{{ASSET_VERSION}}', assetVersion);
+  .replaceAll('{{ASSET_VERSION}}', assetVersion)
+  // Empty when unset — the frontend's push-subscribe code checks for that and
+  // simply doesn't offer the toggle, same graceful-absence pattern as every
+  // other optional integration in this app.
+  .replaceAll('{{VAPID_PUBLIC_KEY}}', process.env.VAPID_PUBLIC_KEY || '')
+  .replaceAll('{{APP_VERSION}}', appVersion)
+  .replaceAll('{{COPYRIGHT_YEAR}}', copyrightYear);
 const renderedManifest = fs.readFileSync(path.join(__dirname, 'public', 'manifest.webmanifest'), 'utf8')
   .replaceAll('{{SITE_NAME}}', siteName);
 // Owner-only control center — a separate page (not just a hidden panel) so
@@ -116,7 +128,9 @@ const renderedManifest = fs.readFileSync(path.join(__dirname, 'public', 'manifes
 // just a shell, same as index.html.
 const renderedAdminHtml = fs.readFileSync(path.join(__dirname, 'public', 'admin.html'), 'utf8')
   .replaceAll('{{SITE_NAME}}', siteName)
-  .replaceAll('{{ASSET_VERSION}}', assetVersion);
+  .replaceAll('{{ASSET_VERSION}}', assetVersion)
+  .replaceAll('{{APP_VERSION}}', appVersion)
+  .replaceAll('{{COPYRIGHT_YEAR}}', copyrightYear);
 
 app.get('/', (req, res) => {
   // Always revalidate the page shell itself, so it picks up the new asset
@@ -139,12 +153,28 @@ app.get('/manifest.webmanifest', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public'), {
   index: false,
   setHeaders: (res, filePath) => {
-    // Icons are unversioned (no ?v= cache-buster like app.js/style.css get), but
-    // also change rarely and deliberately — a week-long cache is a real win for
-    // repeat visits without meaningfully risking a stale favicon/PWA icon.
-    res.set('Cache-Control', filePath.includes(`${path.sep}icons${path.sep}`)
-      ? 'public, max-age=604800'
-      : 'no-cache');
+    const base = path.basename(filePath);
+    // sw.js is the one script that never gets the ?v= cache-buster (it's
+    // registered as a bare navigator.serviceWorker.register('sw.js') — see
+    // app.js) since the browser's own update-check semantics depend on
+    // actually refetching it, not us fingerprinting the URL. Caching it
+    // long-lived would mean a future SW update never reaches clients within
+    // that window, so it stays no-cache regardless of the .js rule below.
+    if (base === 'sw.js') return res.set('Cache-Control', 'no-cache');
+    // Icons and fonts are unversioned (no ?v= cache-buster) but also change
+    // rarely and deliberately — a long cache is a real win for repeat visits
+    // without meaningfully risking staleness.
+    if (filePath.includes(`${path.sep}icons${path.sep}`) || filePath.includes(`${path.sep}fonts${path.sep}`)) {
+      return res.set('Cache-Control', 'public, max-age=604800');
+    }
+    // Everything else that's actually a bundle (app.js, admin.js, shared.js,
+    // style.css, fonts.css) gets a fresh ?v=<deploy timestamp> on every
+    // restart (see assetVersion above) — the URL itself changes on deploy,
+    // so the response body at any given URL is genuinely immutable forever.
+    if (/\.(js|css)$/.test(base)) {
+      return res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+    res.set('Cache-Control', 'no-cache');
   }
 }));
 
