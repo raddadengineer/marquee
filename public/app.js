@@ -78,23 +78,74 @@ function pollSignIn(popup) {
   }
 })();
 
+async function checkSigninConfig() {
+  try {
+    const cfg = await api('/api/auth/config');
+    store.services = cfg.services || {};
+    const btn = document.getElementById('plex-signin-btn');
+    if (cfg.services && !cfg.services.plex) {
+      btn.disabled = true;
+      btn.classList.add('disabled');
+      signinStatus.textContent = 'Plex server is not configured. Ask server owner to configure Plex settings.';
+    }
+  } catch {}
+}
+
+function applyServiceVisibility(services = store.services || {}) {
+  const toggle = (id, enabled) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (enabled) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  };
+
+  // Disable (hide) bento grid panels for unconfigured apps
+  toggle('panel-now-playing', !!services.tautulli);
+  toggle('panel-recently-watched', !!services.tautulli);
+  toggle('panel-top-month', !!services.tautulli);
+  toggle('panel-recently-added', !!services.tautulli);
+  toggle('panel-airing-today', !!services.sonarr);
+  toggle('panel-upcoming', !!services.radarr);
+  toggle('panel-downloads', !!services.downloads);
+
+  // Request feature buttons
+  toggle('search-btn', !!services.overseerr);
+  toggle('fab-request-btn', !!services.overseerr);
+
+  // Report issue feature buttons
+  const canReport = !!(services.plex && services.overseerr);
+  toggle('report-search-btn', canReport);
+  toggle('fab-report-btn', canReport);
+}
+
 let isOwner = false;
 
-function showDashboard(owner) {
+function showDashboard(owner, services = {}) {
   isOwner = owner;
+  store.services = services;
   signinScreen.classList.add('hidden');
   dashboardScreen.classList.remove('hidden');
   setHeroDate();
   loadNotice();
   loadHeroBanners();
-  connectNowPlayingStream();
-  loadRecentlyWatched();
-  loadTopOfMonth();
-  loadRecentlyAdded();
-  loadAiringToday();
-  loadUpcoming();
-  loadDownloads();
-  setInterval(loadDownloads, 5000);
+  applyServiceVisibility(services);
+
+  if (services.tautulli) {
+    connectNowPlayingStream();
+    loadRecentlyWatched();
+    loadTopOfMonth();
+    loadRecentlyAdded();
+  }
+  if (services.sonarr) {
+    loadAiringToday();
+  }
+  if (services.radarr) {
+    loadUpcoming();
+  }
+  if (services.downloads) {
+    loadDownloads();
+    setInterval(loadDownloads, 5000);
+  }
   // Everything owner-only (sign-ins, pending requests, issues, system status,
   // stack management) lives on its own page now instead of crowding this one.
   document.getElementById('admin-link-btn').classList.toggle('hidden', !isOwner);
