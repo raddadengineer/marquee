@@ -365,11 +365,15 @@ function renderNowPlaying({ sessions, totalBandwidthKbps }) {
 // roughly every ~10s during normal playback (Plex's own notification
 // cadence) — without this, the elapsed/total/ETA/bar only ever visibly
 // ticked on that same cadence. Interpolates forward from the last known
-// progress using wall-clock time elapsed since then (see the 1s ticker
+// position using wall-clock time elapsed since then (see the 1s ticker
 // below), frozen in place whenever the session isn't actively 'playing' so
-// a pause doesn't make it look like time is still passing.
+// a pause doesn't make it look like time is still passing. Anchored on the
+// exact viewOffsetMs rather than reconstructing from the rounded whole-
+// percent progress field — that rounding alone can be several seconds off
+// on a typical episode, which would otherwise show up as a real (if small)
+// sync error even before any interpolation happens.
 function interpolatedElapsedMs(s) {
-  const base = (s.durationMs || 0) * (s.progress / 100);
+  const base = s.viewOffsetMs != null ? s.viewOffsetMs : (s.durationMs || 0) * (s.progress / 100);
   if (s.state !== 'playing' || !s.syncedAt) return base;
   return Math.min(s.durationMs || 0, base + (Date.now() - s.syncedAt));
 }
@@ -405,12 +409,13 @@ setInterval(() => {
   }
 }, 1000);
 
-function patchNowPlayingRow({ sessionKey, state, progress }) {
+function patchNowPlayingRow({ sessionKey, state, progress, viewOffsetMs }) {
   const s = store.nowPlaying.find(x => x.sessionKey === sessionKey);
   const row = document.querySelector(`.now-row[data-session-key="${sessionKey}"]`);
   if (!s || !row) return;
   s.state = state;
   s.progress = progress;
+  s.viewOffsetMs = viewOffsetMs;
   s.syncedAt = Date.now();
   row.querySelector('.state-dot').classList.toggle('paused', state === 'paused');
   row.querySelector('.state-word').textContent = state;

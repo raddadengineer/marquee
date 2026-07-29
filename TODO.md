@@ -378,4 +378,22 @@
       (ticks forward correctly while playing, frozen while paused); live
       on-screen verification still pending an active session
 
+- [x] **Fix**: found the counter was ticking smoothly from a slightly wrong
+      starting point. The backend only ever kept a rounded whole-percent
+      `progress_percent` (Tautulli's own field) — reconstructing elapsed
+      time from that discards real precision, up to ~half a percent of
+      runtime off (several seconds on a typical episode). Both Tautulli's
+      `get_activity` and Plex's own push notifications actually carry an
+      exact `view_offset` in ms; added `viewOffsetMs` to `mapSession` and to
+      the `update` SSE payload (lib/nowPlaying.js), and switched
+      `interpolatedElapsedMs` to anchor on that instead of reconstructing
+      from the percentage. Verified against a real live session (someone
+      streaming King of the Hill): reconstructing from the rounded percent
+      was ~4.3s off the real position; confirmed via an authenticated curl
+      request (reconstructed a valid signed session cookie from the sqlite
+      store + SESSION_SECRET) that `/api/tautulli/now-playing` and the SSE
+      `update` stream both now carry the exact value, and that consecutive
+      real updates land ~10s apart matching Plex's own push cadence — the
+      gap the 1s interpolation ticker is there to smooth over
+
 ## Ideas
