@@ -143,6 +143,34 @@ async function fetchSeriesSummary(ratingKey) {
   }
 }
 
+function parseLibraryConfig() {
+  const custom = process.env.TAUTULLI_LIBRARIES;
+  if (custom && custom.trim()) {
+    const pairs = custom.split(',').map(s => s.trim()).filter(Boolean);
+    const result = [];
+    for (const pair of pairs) {
+      const parts = pair.split(':');
+      if (parts.length >= 2) {
+        const label = parts.slice(0, -1).join(':').trim();
+        const sectionId = parts[parts.length - 1].trim();
+        if (label && sectionId) {
+          const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+          result.push({ key, label, sectionId });
+        }
+      }
+    }
+    if (result.length > 0) return result;
+  }
+
+  const { TAUTULLI_SECTION_MOVIES, TAUTULLI_SECTION_TV, TAUTULLI_SECTION_ANIME } = process.env;
+  const legacy = [];
+  if (TAUTULLI_SECTION_MOVIES) legacy.push({ key: 'movies', label: 'Movies', sectionId: TAUTULLI_SECTION_MOVIES });
+  if (TAUTULLI_SECTION_TV) legacy.push({ key: 'tv', label: 'TV Shows', sectionId: TAUTULLI_SECTION_TV });
+  if (TAUTULLI_SECTION_ANIME) legacy.push({ key: 'anime', label: 'Anime', sectionId: TAUTULLI_SECTION_ANIME });
+
+  return legacy;
+}
+
 router.get('/recently-added', requireAuth, async (req, res) => {
   try {
     const config = parseLibraryConfig();

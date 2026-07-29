@@ -11,7 +11,6 @@ const { annotateAndSort } = require('../lib/stuckRequests');
 const router = express.Router();
 
 const fs = require('fs');
-const axios = require('axios');
 
 router.get('/status', requireAuth, requireOwner, async (req, res) => {
   if (!isConfigured('systemStatus')) {

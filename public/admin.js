@@ -961,6 +961,14 @@ function renderSettingsEdit() {
       inputHtml = `<input class="settings-input-full" type="password" data-key="${f.key}" data-type="secret" placeholder="${placeholder}" autocomplete="off">`;
     } else {
       inputHtml = `<input class="settings-input-full" type="text" data-key="${f.key}" data-type="text" value="${escapeHtml(f.value || '')}">`;
+      if (f.key === 'TAUTULLI_LIBRARIES') {
+        inputHtml += `
+          <div class="settings-detect-row" style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
+            <button type="button" id="detect-tautulli-libs-btn" class="pill-btn" style="padding: 0.25rem 0.5rem; font-size: 0.85rem;">Auto-Detect Libraries</button>
+            <span id="detect-tautulli-libs-status" style="font-size: 0.85rem; opacity: 0.8;"></span>
+          </div>
+        `;
+      }
     }
     return `
       <div class="settings-field-block">
@@ -974,6 +982,34 @@ function renderSettingsEdit() {
     el.addEventListener('input', updateSettingsEditSaveState);
     el.addEventListener('change', updateSettingsEditSaveState);
   });
+
+  const detectBtn = body.querySelector('#detect-tautulli-libs-btn');
+  if (detectBtn) {
+    detectBtn.addEventListener('click', async () => {
+      const statusEl = body.querySelector('#detect-tautulli-libs-status');
+      statusEl.textContent = 'Detecting...';
+      statusEl.style.color = '';
+      try {
+        const libs = await api('/api/tautulli/libraries');
+        if (libs && libs.length > 0) {
+          const formatted = libs.map(l => `${l.name}:${l.sectionId}`).join(', ');
+          const input = body.querySelector('[data-key="TAUTULLI_LIBRARIES"]');
+          if (input) {
+            input.value = formatted;
+            input.dispatchEvent(new Event('input'));
+          }
+          statusEl.textContent = 'Success!';
+          statusEl.style.color = '#4caf50';
+        } else {
+          statusEl.textContent = 'No libraries found.';
+          statusEl.style.color = '#f44336';
+        }
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + (err.message || 'Ensure Tautulli is configured.');
+        statusEl.style.color = '#f44336';
+      }
+    });
+  }
 }
 
 function collectSettingsEditChanges() {
