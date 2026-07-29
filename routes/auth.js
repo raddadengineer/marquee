@@ -80,15 +80,19 @@ router.get('/plex/poll', pollLimiter, async (req, res) => {
 async function isAllowedOnServer(userId, userToken) {
   console.log(`[access-check] verifying plex.tv user id=${userId} against machine id=${process.env.PLEX_MACHINE_ID}`);
 
-  // Owner check: does this token see the server as itself?
+  // Owner check: does this token own the server itself — not just have shared
+  // access to it. /api/v2/resources returns every server a token can reach at
+  // all (owned or shared-to), so matching on clientIdentifier alone passed
+  // for any family member with ordinary shared access too — confirmed live,
+  // this was granting every signed-in user isOwner:true. Plex's own `owned`
+  // field on each resource is what actually distinguishes the two.
   try {
     const { data: resources } = await axios.get('https://plex.tv/api/v2/resources', {
       params: { includeHttps: 1 },
       headers: { ...PLEX_HEADERS, 'X-Plex-Token': userToken }
     });
-    const seenIds = resources.map(r => r.clientIdentifier);
-    console.log('[access-check] resources visible to this token:', seenIds);
-    const ownsServer = seenIds.includes(process.env.PLEX_MACHINE_ID);
+    console.log('[access-check] resources visible to this token:', resources.map(r => ({ id: r.clientIdentifier, owned: r.owned })));
+    const ownsServer = resources.some(r => r.clientIdentifier === process.env.PLEX_MACHINE_ID && r.owned === true);
     if (ownsServer) {
       console.log('[access-check] PASSED: owner/resources match');
       return { allowed: true, isOwner: true };

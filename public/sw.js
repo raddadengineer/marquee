@@ -28,3 +28,28 @@ self.addEventListener('fetch', event => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// "Available now" pushes (see lib/pushNotify.js) — reaches people even without
+// a tab open, unlike the SSE toast this mirrors. Payload is plain JSON, not the
+// Notification API's own (differently-shaped) options object.
+self.addEventListener('push', event => {
+  const data = event.data ? event.data.json() : {};
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Marquee', {
+      body: data.body || '',
+      icon: data.icon || '/icons/icon-192.png',
+      badge: '/icons/icon-192.png'
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then(clients => {
+      const existing = clients.find(c => 'focus' in c);
+      if (existing) return existing.focus();
+      return self.clients.openWindow('/');
+    })
+  );
+});

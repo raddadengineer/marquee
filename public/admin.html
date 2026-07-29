@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{SITE_NAME}} — Admin</title>
+<link rel="stylesheet" href="fonts.css?v={{ASSET_VERSION}}">
+<link rel="stylesheet" href="style.css?v={{ASSET_VERSION}}">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- HERO MASTHEAD -->
+  <div class="hero hero-admin">
+    <div class="hero-top">
+      <div>
+        <div class="logo">{{SITE_NAME}}</div>
+        <div class="logo-tag">Admin</div>
+      </div>
+      <div class="hero-icons">
+        <a href="/" class="icon-btn" aria-label="Back to dashboard">&#8592;</a>
+        <button id="open-settings-btn" class="icon-btn" aria-label="Settings">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <button id="admin-logout-btn" class="icon-btn" aria-label="Sign out">&#8594;</button>
+      </div>
+    </div>
+    <div class="hero-diskspace">
+      <h4 class="hero-diskspace-label">Disk Space</h4>
+      <div id="diskspace-body"><p class="empty-state">Loading…</p></div>
+    </div>
+  </div>
+
+  <!-- BENTO GRID -->
+  <div class="bento">
+
+    <section class="card span4" id="panel-admin">
+      <div class="card-label"><span class="chan">CH.09</span> Family</div>
+      <h4 class="admin-subhead">Wanted / Missing</h4>
+      <div id="wanted-body"><p class="empty-state">Loading…</p></div>
+      <h4 class="admin-subhead">Pending requests</h4>
+      <div id="admin-requests-body"><p class="empty-state">Loading…</p></div>
+      <h4 class="admin-subhead">Open issues</h4>
+      <div id="admin-issues-body"><p class="empty-state">Loading…</p></div>
+    </section>
+
+    <section class="card span4" id="panel-stack">
+      <div class="card-label"><span class="chan">CH.10</span> Stack</div>
+      <h4 class="admin-subhead">Search Library</h4>
+      <input id="library-search-input" type="text" placeholder="Search your Radarr/Sonarr library…" autocomplete="off">
+      <div id="library-search-body"><p class="empty-state">Type to search.</p></div>
+      <h4 class="admin-subhead">Seeding</h4>
+      <div id="seeding-body"><p class="empty-state">Loading…</p></div>
+      <h4 class="admin-subhead">Download Issues</h4>
+      <div id="download-issues-body"><p class="empty-state">Loading…</p></div>
+      <h4 class="admin-subhead">Import Issues</h4>
+      <div id="import-issues-body"><p class="empty-state">Loading…</p></div>
+      <h4 class="admin-subhead">Indexers</h4>
+      <div id="indexers-body"><p class="empty-state">Loading…</p></div>
+    </section>
+
+  </div>
+  <div class="app-footer">{{SITE_NAME}} v{{APP_VERSION}} &middot; &copy; {{COPYRIGHT_YEAR}}</div>
+</div>
+
+<!-- RELEASE SEARCH MODAL -->
+<div id="release-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="release-modal-title">Search for a release</h3>
+      <button id="close-release-modal-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+    <div id="release-list" class="release-list"><p class="empty-state">Loading…</p></div>
+  </div>
+</div>
+
+<!-- CURRENT FILE INFO MODAL (shown before jumping to release search) -->
+<div id="file-info-modal" class="modal hidden">
+  <div class="modal-card info-card">
+    <button id="close-file-info-btn" class="pill-btn pill-btn-icon info-close">&#10005;</button>
+    <div class="info-layout">
+      <img id="file-info-poster" class="info-poster" src="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div class="info-body">
+        <span id="file-info-badge" class="chan"></span>
+        <h3 id="file-info-title"></h3>
+        <p id="file-info-subtitle" class="info-meta"></p>
+        <p id="file-info-details" class="info-overview"></p>
+        <div class="pending-actions">
+          <button id="file-info-search-btn" class="search-release-btn pill-btn">
+            <span class="state-dot"></span><span class="btn-label">Search for release</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MANUAL IMPORT MODAL -->
+<div id="manual-import-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="manual-import-title">Manual import</h3>
+      <button id="close-manual-import-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+    <div id="manual-import-list" class="release-list"><p class="empty-state">Loading…</p></div>
+  </div>
+</div>
+
+<!-- LIBRARY SEARCH: TV SEASON/EPISODE BROWSE (release search is per-episode) -->
+<div id="library-browse-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="library-browse-title">Choose a season</h3>
+      <button id="close-library-browse-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+    <button id="library-browse-back" class="pill-btn hidden"><span class="state-dot paused"></span>&#8592; Back to seasons</button>
+    <div id="library-browse-list" class="season-list"></div>
+  </div>
+</div>
+
+<!-- WANTED/MISSING INFO MODAL -->
+<div id="wanted-info-modal" class="modal hidden">
+  <div class="modal-card info-card">
+    <button id="close-wanted-info-btn" class="pill-btn pill-btn-icon info-close">&#10005;</button>
+    <div class="info-layout">
+      <img id="wanted-info-poster" class="info-poster" src="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div class="info-body">
+        <span id="wanted-info-badge" class="chan"></span>
+        <h3 id="wanted-info-title"></h3>
+        <p id="wanted-info-meta" class="info-meta"></p>
+        <p id="wanted-info-overview" class="info-overview"></p>
+        <div class="pending-actions">
+          <button id="wanted-info-search-btn" class="search-release-btn pill-btn">
+            <span class="state-dot"></span><span class="btn-label">Search</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL: service health grid -->
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-card settings-card">
+    <div class="modal-head">
+      <h3>Settings</h3>
+      <button id="close-settings-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+
+    <div class="modal-tabs">
+      <button id="tab-settings-services-btn" class="modal-tab pill-btn active"><span class="state-dot"></span>Services</button>
+      <button id="tab-settings-status-btn" class="modal-tab pill-btn"><span class="state-dot"></span>System Status</button>
+      <button id="tab-settings-signins-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Recent Sign-ins</button>
+      <button id="tab-settings-notice-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Notice Board</button>
+    </div>
+
+    <div id="settings-services-tab" class="settings-body">
+      <div class="settings-section-row">
+        <h4 class="admin-subhead">Integrated Service Health &amp; Latency</h4>
+        <button id="run-health-check-btn" class="pill-btn"><span class="state-dot"></span>Run Health Check</button>
+      </div>
+      <div id="service-grid" class="service-grid"><p class="empty-state">Loading…</p></div>
+
+      <div class="settings-section-row settings-section-row-spaced">
+        <h4 class="admin-subhead">Server &amp; Deployment Configuration</h4>
+        <button id="edit-deployment-btn" class="pill-btn"><span class="state-dot"></span>Edit Deployment Settings</button>
+      </div>
+    </div>
+
+    <div id="settings-status-tab" class="settings-body hidden">
+      <div id="owner-body"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="settings-signins-tab" class="settings-body hidden">
+      <div id="admin-logins-body"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="settings-notice-tab" class="settings-body hidden">
+      <p id="notice-status-text" class="discover-label"></p>
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Message</label>
+        <div class="notice-preset-row">
+          <button type="button" class="pill-btn" data-preset="hardware">Hardware Issue</button>
+          <button type="button" class="pill-btn" data-preset="network">Network Issue</button>
+          <button type="button" class="pill-btn" data-preset="software">Software Issue</button>
+        </div>
+        <div class="notice-preset-row notice-preset-row-fun">
+          <button type="button" class="pill-btn" data-preset="touchGrass">Touch Grass</button>
+          <button type="button" class="pill-btn" data-preset="watchedEverything">Watched Everything</button>
+          <button type="button" class="pill-btn" data-preset="skynetWisdom">Skynet Wisdom</button>
+        </div>
+        <textarea id="notice-message-input" class="settings-input-full" rows="3" maxlength="500"
+          placeholder="e.g. Server will be down Monday night for routine maintenance."></textarea>
+      </div>
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Starts showing</label>
+        <input id="notice-starts-input" class="settings-input-full" type="datetime-local">
+        <p class="settings-field-block-desc">Leave blank to show as soon as you post it.</p>
+      </div>
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Stops showing</label>
+        <input id="notice-ends-input" class="settings-input-full" type="datetime-local">
+        <p class="settings-field-block-desc">Leave blank to show until you clear it.</p>
+      </div>
+      <div class="settings-edit-actions">
+        <button id="notice-clear-btn" class="pill-btn hidden">Clear Notice</button>
+        <button id="notice-save-btn" class="btn-primary">Post Notice</button>
+      </div>
+      <p id="notice-save-status" class="settings-status hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS EDIT POPUP: shared by each service card's Edit button and
+     Edit Deployment Settings — whichever was opened last populates this. -->
+<div id="settings-edit-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="settings-edit-title">Configuration</h3>
+      <button id="close-settings-edit-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+    </div>
+    <div id="settings-edit-body" class="settings-body"><p class="empty-state">Loading…</p></div>
+    <p id="settings-edit-status" class="settings-status hidden"></p>
+    <div class="settings-edit-actions">
+      <button id="settings-edit-cancel-btn" class="pill-btn">Cancel</button>
+      <button id="settings-edit-save-btn" class="btn-primary" disabled>Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DIALOG (replaces the browser's native confirm() — see shared.js's confirmDialog) -->
+<div id="confirm-modal" class="modal hidden">
+  <div class="modal-card confirm-card">
+    <p id="confirm-message"></p>
+    <div class="settings-edit-actions">
+      <button id="confirm-cancel-btn" class="pill-btn">Cancel</button>
+      <button id="confirm-ok-btn" class="btn-primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js?v={{ASSET_VERSION}}"></script>
+<script src="admin.js?v={{ASSET_VERSION}}"></script>
+</body>
+</html>

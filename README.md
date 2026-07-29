@@ -4,6 +4,12 @@ A self-hosted dashboard for your Plex family: live "Now Playing," recently added
 (via Tautulli), today's episodes (Sonarr), upcoming releases (Radarr), and a
 request UI backed by Overseerr/Jellyseerr — all behind Plex sign-in.
 
+The server owner also gets `/admin` — a separate page (not visible to shared
+users) for approving requests, resolving reported issues, searching Radarr/
+Sonarr's indexers for a replacement release, managing the download queue,
+and checking Prowlarr indexer health, all without opening each service's own
+UI.
+
 ## 1. Configure
 
 ```bash
@@ -27,6 +33,7 @@ Fill in `.env`:
 | `TAUTULLI_API_KEY` | Tautulli → Settings → Web Interface → API Key |
 | `SONARR_API_KEY` / `RADARR_API_KEY` | Settings → General → Security in each app |
 | `OVERSEERR_API_KEY` | Overseerr/Jellyseerr → Settings → General → API Key |
+| `PROWLARR_API_KEY` | Settings → General → Security (optional — only powers the admin page's indexer health check) |
 
 The URLs default to `localhost` as a placeholder — set each one to wherever
 that service actually lives (your LAN, another container, etc). Set
@@ -82,16 +89,22 @@ handles auth entirely.
 marquee/
   Dockerfile
   docker-compose.yml
-  server.js              # entrypoint
+  server.js              # entrypoint, serves / and /admin
   routes/
     auth.js               # Plex OAuth + session
-    plex.js                # now playing + image proxy
-    tautulli.js            # recently added
-    sonarr.js               # airing today
-    radarr.js                # releasing soon
-    overseerr.js              # search + request
+    plex.js                # now playing + image proxy + library search
+    tautulli.js            # recently added, recently watched, top of month
+    sonarr.js               # airing today, release search, queue
+    radarr.js                # releasing soon, release search, queue
+    overseerr.js              # search/discover, request, issues, webhook
+    downloads.js               # qBittorrent/SABnzbd queue + owner actions
+    owner.js                    # system status, sign-in log, wanted/missing
+    prowlarr.js                  # indexer health
   public/
-    index.html
-    style.css              # control-room visual theme
-    app.js
+    index.html            # family dashboard
+    admin.html              # owner-only control page
+    style.css                # shared visual theme
+    shared.js                 # utilities used by both pages
+    app.js                      # dashboard-only logic
+    admin.js                     # admin-page-only logic
 ```

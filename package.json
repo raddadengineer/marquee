@@ -1,12 +1,13 @@
 {
   "name": "marquee",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Marquee — a self-hosted dashboard for your Plex family",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "axios": "^1.7.7",
@@ -15,8 +16,14 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
+    "web-push": "^3.6.7",
     "ws": "^8.18.0",
     "xml2js": "^0.6.2"
+  },
+  "overrides": {
+    "connect-sqlite3": {
+      "sqlite3": "$sqlite3"
+    }
   }
 }

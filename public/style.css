@@ -164,100 +164,63 @@ body {
   background: #151a23;
   box-shadow: 0 24px 48px -28px rgba(20, 25, 35, 0.4);
 }
-
-.hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: radial-gradient(circle at 78% 25%, rgba(255, 255, 255, 0.12), transparent 55%);
-  pointer-events: none;
-}
-
-.hero-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
+.hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 78% 25%, rgba(255,255,255,0.15), transparent 55%); }
+/* Cycling backdrop banner — sits behind .hero-top/.hero-mid (those have
+   z-index:1, this doesn't, so it always stays underneath regardless of DOM
+   order) using .hero's own dark gradient as the base/fallback until the
+   first image loads. The ::after scrim keeps header text readable over
+   whatever photo is showing, same idea as .hero's own gradient. */
+.hero-bg { position: absolute; inset: 0; overflow: hidden; }
 .hero-bg-slide {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center 25%;
-  opacity: 0;
-  transition: opacity 1.5s ease-in-out, transform 15s ease-out;
-  filter: brightness(0.68) contrast(1.08);
-  transform: scale(1.04);
+  position: absolute; inset: 0; background-size: cover; background-position: center;
+  opacity: 0; transition: opacity 1.4s ease;
 }
-
-.hero-bg-slide.active {
-  opacity: 1;
-  transform: scale(1.0);
+.hero-bg-slide.active { opacity: 1; }
+.hero-bg::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(120deg, rgba(30,37,49,0.9), rgba(20,25,35,0.78) 65%);
 }
-
-.hero-bg-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: linear-gradient(180deg, rgba(18, 21, 26, 0.65) 0%, rgba(18, 21, 26, 0.3) 45%, rgba(18, 21, 26, 0.85) 100%),
-    linear-gradient(90deg, rgba(18, 21, 26, 0.75) 0%, transparent 65%, rgba(18, 21, 26, 0.4) 100%);
+.hero-featured-tag {
+  font-family: var(--mono); font-size: 0.68rem; color: rgba(255,255,255,0.75);
+  margin-top: 0.3rem; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
-
-.hero-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-  position: relative;
-  z-index: 2;
-  color: #fff;
-}
-
-.logo {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 1.4rem;
-  color: #fff;
-}
-
-.logo-tag {
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.55);
-  text-transform: uppercase;
-  margin-top: 1px;
-}
-
-.hero-icons {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-}
-
+.hero-featured-tag:hover { color: #fff; }
+.hero-top { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; position: relative; z-index: 1; color: #fff; }
+.logo { font-family: var(--display); font-weight: 700; font-size: 1.4rem; color: #fff; }
+.logo-tag { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.04em; color: rgba(255,255,255,0.55); text-transform: uppercase; margin-top: 1px; }
+.hero-icons { display: flex; gap: 0.6rem; align-items: center; }
+/* Admin hero masthead's Disk Space section — dark background, so the shared
+   .now-title/.now-meta/.disk-donut-track tokens (tuned for light cards)
+   need overriding here; .disk-donut-fill's amber/danger stay as-is, already
+   visible on dark. */
+.hero-diskspace { position: relative; z-index: 1; padding: 0 1.5rem 1.25rem; }
+.hero-diskspace-label { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.04em; color: rgba(255,255,255,0.55); text-transform: uppercase; margin: 0 0 0.6rem; font-weight: 500; }
+.hero-diskspace .now-title { color: #fff; }
+.hero-diskspace .now-meta { color: rgba(255,255,255,0.7); }
+.hero-diskspace .disk-donut-track { stroke: rgba(255,255,255,0.18); }
+.hero-diskspace .empty-state { color: rgba(255,255,255,0.7); }
+/* Unlike the family dashboard's hero, admin's has no cycling banner image
+   needing a fixed box — height:220px + overflow:hidden was clipping the
+   Disk Space section whenever volumes wrapped to more rows than fit
+   (confirmed live on mobile: 3 volumes stacked single-column, 3rd cut off). */
+.hero-admin { height: auto; }
 .icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 1rem;
-  cursor: pointer;
-  line-height: 1;
+  width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1rem;
+  cursor: pointer; line-height: 1; text-decoration: none;
 }
+.icon-btn:hover { background: rgba(255,255,255,0.28); }
+/* Notification bell, once subscribed — same amber the rest of the app uses
+   for "on"/active state (download progress bars, disk gauges). */
+.icon-btn.active { background: var(--amber); border-color: var(--amber); }
+/* An SVG child (admin-link-btn) defaults to inline, which leaves a few px of
+   baseline whitespace under it even inside a flex-centered parent — block
+   avoids that so it centers exactly like the text-glyph icon buttons do. */
+.icon-btn svg { display: block; }
 
-.icon-btn:hover {
-  background: rgba(255, 255, 255, 0.28);
-}
+.app-footer { text-align: center; font-family: var(--mono); font-size: 0.7rem; color: var(--muted); padding: 1.5rem 0 5rem; }
 
 /* Floating request button — mobile only (see the media query below); desktop
    keeps the plain header icon button (.icon-btn above) instead. Styled to match
@@ -356,9 +319,10 @@ body {
 
   /* The report icon button in the header is desktop-only — .fab-left below is
      its mobile equivalent, mirroring the request FAB on the opposite side. */
-  .hero-icons #report-search-btn {
-    display: none;
-  }
+  .hero-icons #report-search-btn { display: none; }
+  /* Admin link has no FAB equivalent (it's low-frequency, doesn't warrant a
+     third floating button) — stays in the header icon row on mobile too,
+     alongside the avatar chip and logout button which are already there. */
 }
 
 .avatar-chip {
@@ -475,24 +439,19 @@ body {
   font-family: var(--mono);
 }
 
+/* Owner-scheduled announcement — a persistent broadcast-style alert, not a
+   toast, since a maintenance notice should stay visible the whole scheduled
+   window rather than auto-dismiss after a few seconds. */
+.notice-banner {
+  display: flex; align-items: center; gap: 0.65rem; padding: 0.8rem 1.1rem;
+  background: rgba(224,138,30,0.12); border: 1px solid rgba(224,138,30,0.35);
+  border-radius: 12px; color: var(--text); font-size: 0.85rem; margin-bottom: 1.1rem;
+}
+.notice-banner-icon { flex-shrink: 0; color: var(--amber); }
+
 /* ---------- Bento grid ---------- */
-.bento {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1.1rem;
-}
-
-.span1 {
-  grid-column: span 1;
-}
-
-.span2 {
-  grid-column: span 2;
-}
-
-.span4 {
-  grid-column: span 4;
-}
+.bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.1rem; }
+.span2 { grid-column: span 2; } .span4 { grid-column: span 4; }
 
 .card {
   background: var(--card);
@@ -614,6 +573,22 @@ body {
   background: var(--amber);
 }
 
+/* Disk Space panel's per-volume gauge — same amber/danger semantics as
+   .bar-fill/.state-dot.danger, just circular instead of linear. pathLength="100"
+   on both circles lets stroke-dasharray take a plain percentage directly,
+   no circumference math needed. */
+.disk-donut { width: 40px; height: 40px; flex-shrink: 0; transform: rotate(-90deg); }
+.disk-donut-track { fill: none; stroke: rgba(20,25,35,0.08); stroke-width: 3.5; }
+.disk-donut-fill { fill: none; stroke: var(--amber); stroke-width: 3.5; stroke-linecap: round; transition: stroke-dasharray 0.3s ease; }
+.disk-donut-fill.danger { stroke: var(--danger); }
+
+/* Volumes side by side instead of stacked — a plain vertical list reads odd
+   for just 2-3 items that aren't really a sequence. Wraps on narrow widths
+   instead of the list-divider look .dl-row uses elsewhere (Download Queue/
+   Issues), which stays untouched since those genuinely are lists. */
+#diskspace-body { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+#diskspace-body .dl-row { flex: 1 1 200px; padding: 0; border-bottom: none; }
+
 /* Recently Watched reuses the Now Playing row markup (.now-row/.thumb/.now-meta),
    minus the progress bar. flex:1 on a flex-column .card fills whatever height the row's tallest
    sibling (Now Playing) naturally wants — grid stretch then matches Now Playing's
@@ -627,22 +602,10 @@ body {
 }
 
 /* Download queue rows — same shape as Now Playing rows but not clickable */
-.dl-row {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 0.65rem 0;
-  border-bottom: 1px solid rgba(20, 25, 35, 0.06);
-}
-
-.dl-row:last-child {
-  border-bottom: none;
-}
-
-.dl-row-body {
-  flex: 1;
-  min-width: 0;
-}
+.dl-row { display: flex; align-items: center; gap: 0.9rem; padding: 0.65rem 0; border-bottom: 1px solid rgba(20,25,35,0.06); }
+.dl-row:last-child { border-bottom: none; }
+.dl-row-clickable { cursor: pointer; }
+.dl-row-body { flex: 1; min-width: 0; }
 
 /* Top of the Month leaderboard — #1 gets the big medal frame, #2/#3 are compact
    ranked rows underneath, each color-coded gold/silver/bronze. */
@@ -791,6 +754,16 @@ body {
   }
 }
 
+/* Admin: Seeding — just a handful of numbers, no file list. Wraps to 2x2 on
+   narrow cards instead of squeezing four values onto one line. */
+.stat-pair { display: flex; flex-wrap: wrap; gap: 1rem 0.5rem; text-align: center; }
+.stat-tile { flex: 1 1 35%; min-width: 90px; }
+.stat-value { font-family: var(--display); font-size: 1.4rem; font-weight: 600; color: var(--teal); white-space: nowrap; }
+.stat-label {
+  font-family: var(--mono); font-size: 0.64rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem;
+}
+
 /* Owner-only status panel */
 .ups-status {
   padding-bottom: 0.85rem;
@@ -888,65 +861,16 @@ body {
   background: rgba(255, 255, 255, 0.85);
   color: #12151A;
 }
-
-.poster-meta {
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-family: var(--mono);
-  margin-top: 0.4rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.poster-meta.available {
-  color: var(--teal);
-  font-weight: 600;
-}
-
-/* Positioning modifier for .bar when it overlays a poster instead of sitting inline */
-.poster-progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  margin-top: 0;
-  border-radius: 0;
-  height: 4px;
-  background: rgba(0, 0, 0, 0.35);
-}
-
+.poster-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); margin-top: 0.4rem; }
 .subsection-label {
-  font-family: var(--display);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-  margin: 0 0 0.6rem;
-  padding-top: 0.2rem;
-}
-
-.subsection-label:not(:first-child) {
-  margin-top: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(20, 25, 35, 0.06);
+  font-family: var(--display); font-size: 0.85rem; font-weight: 600; color: var(--text);
+  margin: 0 0 0.6rem; padding-top: 0.2rem;
 }
 
 @media (max-width: 900px) {
-
-  .span1,
-  .span2,
-  .span4 {
-    grid-column: span 4;
-  }
-
-  .bento {
-    grid-template-columns: 1fr;
-  }
-
-  .frame {
-    padding: 1.25rem;
-  }
-
+  .span2, .span4 { grid-column: span 4; }
+  .bento { grid-template-columns: 1fr; }
+  .frame { padding: 1.25rem; }
   /* Cards stack into one column here, so Now Playing and Recently Watched are no
      longer row-siblings to stretch-match — flex:1 alone would collapse this to
      ~0 height with nothing to fill against, so cap it to roughly 8 rows instead. */
@@ -1037,29 +961,28 @@ body {
   background: rgba(15, 143, 118, 0.08);
 }
 
-/* Both tab panes sit in the same flex-column .modal-card, so each needs to be
+/* All tab panes (plus the season picker, shown in place of whichever tab
+   triggered it) sit in the same flex-column .modal-card, so each needs to be
    a flex column itself (min-height:0 so overflow-y:auto below actually kicks
    in instead of the card just growing past its max-height). */
-#search-tab,
-#myrequests-tab,
-#report-search-view,
-#report-browse-view,
-#report-form-view {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+#search-tab, #myrequests-tab, #watchlist-tab, #season-picker, #report-search-view, #report-browse-view, #report-form-view {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
 }
 
 /* Report modal's browse view (show -> seasons -> episodes) — plain clickable
    navigation rows, distinct from .season-row's checkbox-select rows in the
    request modal's season picker. */
-.browse-row {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.6rem 0;
-  cursor: pointer;
+.browse-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.6rem 0; cursor: pointer; }
+.browse-row + .browse-row { border-top: 1px solid rgba(20,25,35,0.08); }
+.browse-row:hover { opacity: 0.85; }
+.browse-row-thumb { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; background: #E2E6EC; flex-shrink: 0; }
+.browse-row-name { font-size: 0.85rem; font-weight: 600; }
+.browse-row-index { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); }
+
+#search-input, #report-search-input, #library-search-input {
+  width: 100%; padding: 0.75rem 0.95rem; background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(20,25,35,0.1); border-radius: 9px; color: var(--text);
+  font-family: var(--body); font-size: 0.9rem; margin-bottom: 0.85rem;
 }
 
 .browse-row+.browse-row {
@@ -1265,86 +1188,42 @@ body {
 }
 
 /* Media info modal */
-.info-card {
-  width: min(620px, 92vw);
-  padding: 0;
-  overflow: hidden;
-  position: relative;
-}
+.info-card { width: min(620px, 92vw); padding: 0; overflow: hidden; position: relative; }
+.info-close { position: absolute; top: 0.85rem; right: 0.85rem; z-index: 2; }
+.info-layout { display: flex; gap: 1.5rem; padding: 1.5rem; max-height: 78vh; overflow-y: auto; }
+.info-poster { width: 150px; flex-shrink: 0; border-radius: 12px; object-fit: cover; aspect-ratio: 2/3; background: #E2E6EC; box-shadow: 0 16px 32px -14px rgba(20,25,35,0.4); }
+/* Reserves permanent clearance under .info-close (absolutely positioned over
+   the top-right corner) so the CH.NN badge (first thing in the body) never
+   sits underneath it. */
+.info-body { min-width: 0; padding-right: 1.75rem; }
+.info-body h3 { font-family: var(--display); font-size: 1.3rem; font-weight: 600; margin: 0.6rem 0 0.3rem; }
+.info-meta { color: var(--muted); font-family: var(--mono); font-size: 0.78rem; margin: 0 0 0.85rem; }
+.info-overview { font-size: 0.9rem; line-height: 1.55; color: #2b3140; margin: 0; }
 
-.info-close {
-  position: absolute;
-  top: 0.85rem;
-  right: 0.85rem;
-  z-index: 2;
+/* On a real phone width, the 150px poster + gap left too little room for the
+   text column even with the padding-right reservation above — the CH.NN
+   badge was wrapping onto two lines instead. Stacking poster-then-text
+   gives the column the full card width, and the close button ends up
+   floating over the poster's top-right corner instead of competing with
+   text for space — a normal, non-colliding pattern. */
+@media (max-width: 480px) {
+  .info-layout { flex-direction: column; }
+  .info-poster { width: 140px; margin: 0 auto 0.5rem; }
+  .info-body { padding-right: 0; }
 }
-
-.info-layout {
-  display: flex;
-  gap: 1.5rem;
-  padding: 1.5rem;
-  max-height: 78vh;
-  overflow-y: auto;
-}
-
-.info-poster {
-  width: 150px;
-  flex-shrink: 0;
-  border-radius: 12px;
-  object-fit: cover;
-  aspect-ratio: 2/3;
-  background: #E2E6EC;
-  box-shadow: 0 16px 32px -14px rgba(20, 25, 35, 0.4);
-}
-
-.info-body {
-  min-width: 0;
-}
-
-.info-body h3 {
-  font-family: var(--display);
-  font-size: 1.3rem;
-  font-weight: 600;
-  margin: 0.6rem 0 0.3rem;
-}
-
-.info-meta {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  margin: 0 0 0.85rem;
-}
-
-.info-overview {
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: #2b3140;
-  margin: 0;
-}
-
 .info-stream {
-  margin: 0.9rem 0 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(20, 25, 35, 0.1);
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.3rem 0.75rem;
-  font-family: var(--mono);
-  font-size: 0.76rem;
+  margin: 0.9rem 0 0; padding-top: 0.75rem; border-top: 1px solid rgba(20,25,35,0.1);
+  display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.75rem;
+  font-family: var(--mono); font-size: 0.76rem;
 }
 
-.info-stream.hidden {
-  display: none;
-}
-
-.info-stream dt {
-  color: var(--muted);
-}
-
-.info-stream dd {
-  margin: 0;
-  color: #2b3140;
-}
+/* Torrent details modal (Download Queue -> click a torrent row) */
+.torrent-details-card { width: min(560px, 92vw); }
+.torrent-details-layout { padding: 1.5rem; max-height: 78vh; overflow-y: auto; }
+.torrent-details-layout h3 { font-family: var(--display); font-size: 1.1rem; font-weight: 600; margin: 0 1.75rem 0.75rem 0; }
+.torrent-files { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid rgba(20,25,35,0.1); }
+.torrent-file-row { padding: 0.4rem 0; }
+.torrent-file-row .now-title { white-space: normal; overflow-wrap: anywhere; }
 
 /* "Available now" toast — pushed via SSE when Overseerr reports a request has
    finished downloading. Stacks above everything, including the request modal,
@@ -1447,71 +1326,15 @@ body {
   margin-top: 0;
 }
 
-.login-row {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.5rem 0;
-}
-
-.login-row+.login-row {
-  border-top: 1px solid rgba(20, 25, 35, 0.06);
-}
-
-.login-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: #E2E6EC;
-  flex-shrink: 0;
-}
-
-.login-name {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.login-time {
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-family: var(--mono);
-}
-
-.pending-row {
-  display: flex;
-  gap: 0.85rem;
-  align-items: center;
-  padding: 0.65rem 0;
-}
-
-.pending-row+.pending-row {
-  border-top: 1px solid rgba(20, 25, 35, 0.08);
-}
-
-.pending-requester {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 3px;
-  font-size: 0.74rem;
-  color: var(--muted);
-  font-family: var(--mono);
-}
-
-.pending-requester img {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: #E2E6EC;
-}
-
-.pending-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
+.pending-row { display: flex; gap: 0.85rem; align-items: center; padding: 0.65rem 0; }
+.pending-row + .pending-row { border-top: 1px solid rgba(20,25,35,0.08); }
+.pending-requester { display: flex; align-items: center; gap: 0.35rem; margin-top: 3px; font-size: 0.74rem; color: var(--muted); font-family: var(--mono); }
+.pending-requester img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; background: #E2E6EC; }
+.pending-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+/* Wanted/Missing, Search Library, and Open Issues rows act on click anywhere
+   in the row — pending requests and import issues only act on their explicit
+   buttons. */
+#wanted-body .pending-row, #library-search-body .pending-row, #admin-issues-body .pending-row { cursor: pointer; }
 
 /* "Request" — shown on the info modal when opened from a search/discover
    result (not yet in the library), so a title/poster click leads to details
@@ -1606,306 +1429,105 @@ body {
   min-height: 0;
   overflow-y: auto;
 }
+.release-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+.release-rejections { font-size: 0.7rem; color: var(--danger); margin-top: 2px; }
+.grab-btn { flex-shrink: 0; }
 
-.release-row {
-  display: flex;
-  gap: 0.85rem;
-  align-items: center;
-  padding: 0.65rem 0;
+/* Settings modal (owner only) — service health grid + per-service/deployment
+   edit popups. Saving anything restarts the container (see routes/settings.js),
+   since Node only loads .env once at process start. */
+.settings-card { width: min(780px, 94vw); overflow-x: hidden; }
+.settings-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0.5rem 0; }
+/* wraps instead of squeezing "Run Health Check"/"Edit Deployment Settings"
+   into a cramped two-line button next to the heading on narrow screens */
+.settings-section-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.85rem; }
+.settings-section-row .admin-subhead { margin: 0; min-width: 0; }
+.settings-section-row .pill-btn { white-space: nowrap; }
+.settings-section-row-spaced { margin-top: 1.4rem; }
+.settings-status { font-size: 0.8rem; text-align: center; margin: 0.5rem 0 0; }
+.settings-status.error { color: var(--danger); }
+.settings-status.ok { color: var(--teal); }
+
+/* Service health cards */
+.service-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; margin: 0.75rem 0; }
+@media (max-width: 700px) { .service-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Two columns of cards (each with a version string, latency, and Edit button)
+   is too cramped on an actual phone width — confirmed live, cards were
+   overflowing their column and getting clipped by the modal's own edge. */
+@media (max-width: 480px) { .service-grid { grid-template-columns: 1fr; } }
+.service-card {
+  min-width: 0; border: 1px solid rgba(20,25,35,0.08); border-radius: 12px;
+  padding: 0.85rem; background: rgba(255,255,255,0.5);
+}
+.service-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; }
+/* Same shrink priority as the foot row below — the name truncates before
+   the badge (which is short and fixed either way: Online/Unconfigured/Error)
+   is ever allowed to shrink, so every card's badge stays visually uniform. */
+.service-card-name {
+  font-weight: 600; font-size: 0.88rem; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.service-badge {
+  font-family: var(--mono); font-size: 0.64rem; padding: 0.2rem 0.5rem; border-radius: 20px;
+  border: 1px solid; white-space: nowrap; flex-shrink: 0;
+}
+.service-badge.online { color: var(--teal); border-color: rgba(15,143,118,0.35); background: rgba(15,143,118,0.08); }
+.service-badge.unconfigured { color: var(--muted); border-color: rgba(20,25,35,0.12); background: rgba(20,25,35,0.04); }
+.service-badge.error { color: var(--danger); border-color: rgba(214,69,69,0.35); background: rgba(214,69,69,0.08); }
+.service-card-meta {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--muted); min-height: 1.1em;
+  display: flex; align-items: center; gap: 0.35rem;
+}
+.service-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.6rem; }
+/* A long version string (e.g. Plex's) must truncate before the Edit button
+   ever shrinks/wraps — confirmed live, the button was squeezing into a
+   two-line "Edit / ✎" shape instead. */
+.service-card-foot .pill-btn { flex-shrink: 0; white-space: nowrap; }
+.service-card-status-text {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 
-.release-row+.release-row {
-  border-top: 1px solid rgba(20, 25, 35, 0.08);
+/* Settings edit popup — one field per row, full-width input, stacked */
+.settings-field-block + .settings-field-block { margin-top: 0.9rem; }
+.settings-field-block-label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.35rem; }
+.notice-preset-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
+.notice-preset-row-fun { opacity: 0.75; }
+.settings-input-full {
+  width: 100%; padding: 0.6rem 0.75rem; background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(20,25,35,0.1); border-radius: 8px; color: var(--text);
+  font-family: var(--mono); font-size: 0.85rem;
+}
+.settings-input-full:focus { outline: none; border-color: var(--teal); }
+.settings-input-full:disabled { opacity: 0.5; cursor: not-allowed; }
+.settings-field-block-desc { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+/* Cancel and the primary action (Save Changes / OK) share the same shape and
+   size — Cancel keeps its own lighter fill/border, just resized/reshaped to
+   match rather than sitting next to it as a small pill. Applies everywhere
+   this row is used: the settings edit popup and the confirm dialog. */
+.settings-edit-actions { display: flex; gap: 0.6rem; margin-top: 0.5rem; }
+.settings-edit-actions .pill-btn,
+.settings-edit-actions .btn-primary {
+  flex: 1; border-radius: 10px; padding: 0.85rem 1rem;
+  font-size: 0.95rem; font-weight: 600; justify-content: center;
 }
 
-.release-row.rejected {
-  opacity: 0.6;
-}
+/* Confirm dialog — replaces the browser's native confirm() so it matches the
+   rest of the app instead of a plain unstyled OS dialog. */
+.confirm-card { width: min(380px, 90vw); }
+#confirm-message { font-size: 0.92rem; line-height: 1.5; margin: 0 0 1rem; }
 
-.release-info {
-  flex: 1;
-  min-width: 0;
+/* Toggle switch for true/false values */
+.settings-toggle { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+.settings-toggle input { opacity: 0; width: 0; height: 0; }
+.settings-toggle-slider {
+  position: absolute; inset: 0; background: rgba(20,25,35,0.15); border-radius: 22px;
+  transition: background 0.15s ease; cursor: pointer;
 }
-
-.release-title {
-  font-size: 0.82rem;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.settings-toggle-slider::before {
+  content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: transform 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
-
-.release-meta {
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-family: var(--mono);
-  margin-top: 2px;
-}
-
-.release-rejections {
-  font-size: 0.7rem;
-  color: var(--danger);
-  margin-top: 2px;
-}
-
-.grab-btn {
-  flex-shrink: 0;
-}
-
-/* Card Header Flex (bento header + action button) */
-.card-header-flex {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.card-header-flex .card-label {
-  margin-bottom: 0;
-}
-
-/* Wide modal layout & scrollable tab containers */
-.modal-card-wide {
-  max-width: 840px;
-  width: 95%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-card-wide #admin-tab-overview,
-.modal-card-wide #admin-tab-status,
-.modal-card-wide #admin-tab-health {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  padding-right: 6px;
-}
-
-#edit-setting-form {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-#edit-modal-form-body {
-  flex: 1;
-  min-height: 0;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding-right: 6px;
-}
-
-/* Settings & Health views */
-.settings-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.8rem;
-}
-
-.settings-section-head h4 {
-  font-family: var(--head);
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-  margin: 0;
-}
-
-.health-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 0.75rem;
-}
-
-.health-card {
-  padding: 0.75rem 0.9rem;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(20, 25, 35, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.health-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.health-card-title {
-  font-family: var(--head);
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.health-badge {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  padding: 0.15rem 0.45rem;
-  border-radius: 99px;
-  font-weight: 500;
-}
-
-.health-badge.ok {
-  background: rgba(15, 143, 118, 0.12);
-  color: var(--teal);
-  border: 1px solid rgba(15, 143, 118, 0.3);
-}
-
-.health-badge.error {
-  background: rgba(220, 38, 38, 0.12);
-  color: var(--danger);
-  border: 1px solid rgba(220, 38, 38, 0.3);
-}
-
-.health-badge.unconfigured {
-  background: rgba(100, 116, 139, 0.12);
-  color: var(--muted);
-  border: 1px solid rgba(100, 116, 139, 0.25);
-}
-
-.health-card-details {
-  font-family: var(--mono);
-  font-size: 0.74rem;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.health-card-latency {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-/* Config list table */
-.config-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
-  margin-top: 0.5rem;
-}
-
-.config-table tr {
-  border-bottom: 1px solid rgba(20, 25, 35, 0.06);
-}
-
-.config-table td {
-  padding: 0.55rem 0.5rem;
-}
-
-.config-table td.config-key {
-  font-family: var(--mono);
-  font-weight: 500;
-  color: var(--text);
-  width: 40%;
-}
-
-.config-table td.config-val {
-  font-family: var(--mono);
-  color: var(--muted);
-}
-
-.config-pill {
-  display: inline-block;
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-  font-size: 0.72rem;
-  font-family: var(--mono);
-}
-
-.config-pill.yes {
-  background: rgba(15, 143, 118, 0.1);
-  color: var(--teal);
-}
-
-.config-pill.no {
-  background: rgba(220, 38, 38, 0.08);
-  color: var(--danger);
-}
-
-/* Interactive / Editable Service Cards */
-.health-card.clickable {
-  cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.health-card.clickable:hover {
-  border-color: rgba(15, 143, 118, 0.4);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(15, 143, 118, 0.08);
-}
-
-.health-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 0.2rem;
-}
-
-.card-edit-btn {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--teal);
-  background: rgba(15, 143, 118, 0.08);
-  border: 1px solid rgba(15, 143, 118, 0.25);
-  border-radius: 4px;
-  padding: 0.1rem 0.35rem;
-  cursor: pointer;
-}
-
-.card-edit-btn:hover {
-  background: rgba(15, 143, 118, 0.18);
-}
-
-/* Settings Form Group */
-.setting-field {
-  margin-bottom: 0.85rem;
-}
-
-.setting-field label {
-  display: block;
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 0.3rem;
-}
-
-.setting-field input,
-.setting-field select {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.55rem 0.75rem;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(20, 25, 35, 0.12);
-  border-radius: 8px;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 0.82rem;
-  transition: border-color 0.15s ease;
-}
-
-.setting-field input:focus,
-.setting-field select:focus {
-  outline: none;
-  border-color: var(--teal);
-  background: #ffffff;
-}
-
-.setting-hint {
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-family: var(--body);
-  margin-top: 0.25rem;
-}
+.settings-toggle input:checked + .settings-toggle-slider { background: var(--teal); }
+.settings-toggle input:checked + .settings-toggle-slider::before { transform: translateX(18px); }
+.settings-toggle input:disabled + .settings-toggle-slider { opacity: 0.5; cursor: not-allowed; }

@@ -6,6 +6,7 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
+const { checkOrigin } = require('./lib/csrfOrigin');
 
 const app = express();
 
@@ -20,7 +21,33 @@ app.use((req, res, next) => {
   next();
 });
 
-// Persists sessions and saved settings to disk so configuration survives container rebuilds
+// CSRF protection: the session cookie's sameSite:'lax' already stops browsers
+// from attaching it to a cross-site POST/PUT/DELETE, but that's an implicit
+// side effect of a cookie setting, not something the server itself verifies —
+// this makes it explicit. Every state-changing request must carry an Origin
+// header whose host matches the request's own Host header (works the same
+// whichever hostname/port this is actually reached on — Cloudflare domain or
+// direct LAN IP — no hardcoded origin to keep in sync).
+// Exempt: Overseerr's own webhook, which is called server-to-server (never
+// carries a browser Origin) and is already authenticated by its own shared
+// secret — see routes/overseerr.js's /webhook handler.
+const CSRF_EXEMPT_PATHS = new Set(['/api/overseerr/webhook']);
+const CSRF_ERROR_MESSAGES = {
+  missing: 'Missing Origin header',
+  invalid: 'Invalid Origin header',
+  mismatch: 'Cross-origin request blocked'
+};
+app.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (CSRF_EXEMPT_PATHS.has(req.path)) return next();
+
+  const result = checkOrigin(req.headers.origin, req.headers.host);
+  if (result === 'ok') return next();
+  res.status(403).json({ error: CSRF_ERROR_MESSAGES[result] });
+});
+
+// Persists sessions to disk so the family isn't logged out on every
+// `docker compose up -d --build` or container restart.
 const sessionDbDir = process.env.SESSION_DB_DIR || '/app/data';
 fs.mkdirSync(sessionDbDir, { recursive: true });
 
@@ -58,8 +85,13 @@ app.use('/api/tautulli', require('./routes/tautulli'));
 app.use('/api/sonarr', require('./routes/sonarr'));
 app.use('/api/radarr', require('./routes/radarr'));
 app.use('/api/overseerr', require('./routes/overseerr'));
+app.use('/api/watchlist', require('./routes/watchlist'));
 app.use('/api/downloads', require('./routes/downloads'));
 app.use('/api/owner', require('./routes/owner'));
+app.use('/api/settings', require('./routes/settings'));
+app.use('/api/notice', require('./routes/notice'));
+app.use('/api/prowlarr', require('./routes/prowlarr'));
+app.use('/api/push', require('./routes/push'));
 
 // index.html carries a {{SITE_NAME}} placeholder so this same image can show a generic
 // "Marquee" brand out of the box, or your own (e.g. via SITE_NAME=MyPlexHub in .env).
@@ -73,6 +105,11 @@ const taglinesJson = JSON.stringify(taglines).replace(/</g, '\\u003c');
 // Busting the query string on every process start (i.e. every deploy) instead
 // forces a real cache miss, since it's a URL Cloudflare has never cached before.
 const assetVersion = String(Date.now());
+// Footer branding — package.json's version is the single source of truth
+// (bump it there, not here), year is computed once at startup rather than
+// per-request since this is a long-running process, not a static site build.
+const appVersion = require('./package.json').version;
+const copyrightYear = String(new Date().getFullYear());
 // siteName/taglinesJson/assetVersion are all fixed for the life of the process,
 // so both the disk read and the placeholder substitution are redundant on every
 // request — do each exactly once at startup and just serve the resulting string.
@@ -81,15 +118,35 @@ const assetVersion = String(Date.now());
 const renderedHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8')
   .replaceAll('{{SITE_NAME}}', siteName)
   .replace('{{TAGLINES_JSON}}', taglinesJson)
-  .replaceAll('{{ASSET_VERSION}}', assetVersion);
+  .replaceAll('{{ASSET_VERSION}}', assetVersion)
+  // Empty when unset — the frontend's push-subscribe code checks for that and
+  // simply doesn't offer the toggle, same graceful-absence pattern as every
+  // other optional integration in this app.
+  .replaceAll('{{VAPID_PUBLIC_KEY}}', process.env.VAPID_PUBLIC_KEY || '')
+  .replaceAll('{{APP_VERSION}}', appVersion)
+  .replaceAll('{{COPYRIGHT_YEAR}}', copyrightYear);
 const renderedManifest = fs.readFileSync(path.join(__dirname, 'public', 'manifest.webmanifest'), 'utf8')
   .replaceAll('{{SITE_NAME}}', siteName);
+// Owner-only control center — a separate page (not just a hidden panel) so
+// it can grow without crowding the shared family dashboard. Actual access
+// control happens server-side on every /api/owner, /api/*/queue,
+// /api/*/releases, etc. route (requireAuth + requireOwner) — this page is
+// just a shell, same as index.html.
+const renderedAdminHtml = fs.readFileSync(path.join(__dirname, 'public', 'admin.html'), 'utf8')
+  .replaceAll('{{SITE_NAME}}', siteName)
+  .replaceAll('{{ASSET_VERSION}}', assetVersion)
+  .replaceAll('{{APP_VERSION}}', appVersion)
+  .replaceAll('{{COPYRIGHT_YEAR}}', copyrightYear);
 
 app.get('/', (req, res) => {
   // Always revalidate the page shell itself, so it picks up the new asset
   // version immediately rather than also being stuck on a stale cached copy.
   res.set('Cache-Control', 'no-cache');
   res.type('html').send(renderedHtml);
+});
+app.get('/admin', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.type('html').send(renderedAdminHtml);
 });
 // Same {{SITE_NAME}} templating as index.html, so an installed PWA's home-screen
 // label matches whatever this deployment is branded as instead of the generic
@@ -102,12 +159,28 @@ app.get('/manifest.webmanifest', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public'), {
   index: false,
   setHeaders: (res, filePath) => {
-    // Icons are unversioned (no ?v= cache-buster like app.js/style.css get), but
-    // also change rarely and deliberately — a week-long cache is a real win for
-    // repeat visits without meaningfully risking a stale favicon/PWA icon.
-    res.set('Cache-Control', filePath.includes(`${path.sep}icons${path.sep}`)
-      ? 'public, max-age=604800'
-      : 'no-cache');
+    const base = path.basename(filePath);
+    // sw.js is the one script that never gets the ?v= cache-buster (it's
+    // registered as a bare navigator.serviceWorker.register('sw.js') — see
+    // app.js) since the browser's own update-check semantics depend on
+    // actually refetching it, not us fingerprinting the URL. Caching it
+    // long-lived would mean a future SW update never reaches clients within
+    // that window, so it stays no-cache regardless of the .js rule below.
+    if (base === 'sw.js') return res.set('Cache-Control', 'no-cache');
+    // Icons and fonts are unversioned (no ?v= cache-buster) but also change
+    // rarely and deliberately — a long cache is a real win for repeat visits
+    // without meaningfully risking staleness.
+    if (filePath.includes(`${path.sep}icons${path.sep}`) || filePath.includes(`${path.sep}fonts${path.sep}`)) {
+      return res.set('Cache-Control', 'public, max-age=604800');
+    }
+    // Everything else that's actually a bundle (app.js, admin.js, shared.js,
+    // style.css, fonts.css) gets a fresh ?v=<deploy timestamp> on every
+    // restart (see assetVersion above) — the URL itself changes on deploy,
+    // so the response body at any given URL is genuinely immutable forever.
+    if (/\.(js|css)$/.test(base)) {
+      return res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+    res.set('Cache-Control', 'no-cache');
   }
 }));
 
