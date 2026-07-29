@@ -97,27 +97,66 @@ async function loadAdminLogins() {
   }
 }
 
+// Shared by every poll-refreshed admin list that renders a poster/avatar
+// <img> — same problem and fix as Now Playing/Recently Watched on the main
+// dashboard (see renderNowPlaying in app.js): a full innerHTML rebuild on
+// every poll recreates every <img> from scratch, which visibly reloads/
+// flashes it even when nothing in the list actually changed. Reconciles by
+// a caller-supplied stable key instead: an existing row (and its <img>) is
+// created once and left alone, only updateRow's fields refresh in place.
+// The key ends up on the row as data-recon-key — callers whose click
+// handlers need to re-locate the source item (rather than reading it
+// straight off other data-* attributes) can rely on that being present.
+function reconcileList(container, items, keyOf, createRow, updateRow) {
+  const incomingKeys = new Set(items.map(item => String(keyOf(item))));
+  for (const row of container.querySelectorAll('[data-recon-key]')) {
+    if (!incomingKeys.has(row.dataset.reconKey)) row.remove();
+  }
+  if (!container.querySelector('[data-recon-key]')) container.innerHTML = ''; // clear an empty-state message
+  items.forEach(item => {
+    const key = String(keyOf(item));
+    let row = container.querySelector(`[data-recon-key="${key}"]`);
+    if (!row) {
+      row = createRow(item);
+      row.dataset.reconKey = key;
+    }
+    updateRow(row, item);
+    container.appendChild(row); // no-op DOM move if already in place — keeps row order matching items order
+  });
+}
+
+function createPendingRequestRow(r) {
+  const row = document.createElement('div');
+  row.className = 'pending-row';
+  row.innerHTML = `
+    <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
+    <div class="result-info">
+      <div class="result-title"></div>
+      <div class="pending-requester">
+        <img src="${r.requestedByAvatar || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
+        <span class="requester-text"></span>
+      </div>
+    </div>
+    <div class="pending-actions">
+      <button class="approve-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Approve</span></button>
+      <button class="decline-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Decline</span></button>
+    </div>
+  `;
+  return row;
+}
+
+function updatePendingRequestRow(row, r) {
+  row.dataset.id = r.id;
+  row.querySelector('.result-title').textContent = r.title || 'Unknown title';
+  row.querySelector('.requester-text').textContent = `${r.requestedBy} · ${timeAgo(r.requestedAt)}`;
+}
+
 async function loadPendingRequests() {
   const body = document.getElementById('admin-requests-body');
   try {
     const results = await api('/api/overseerr/requests/pending');
     if (!results.length) { body.innerHTML = '<p class="empty-state">Nothing pending.</p>'; return; }
-    body.innerHTML = results.map(r => `
-      <div class="pending-row" data-id="${r.id}">
-        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
-        <div class="result-info">
-          <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
-          <div class="pending-requester">
-            <img src="${r.requestedByAvatar || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
-            ${escapeHtml(r.requestedBy)} · ${timeAgo(r.requestedAt)}
-          </div>
-        </div>
-        <div class="pending-actions">
-          <button class="approve-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Approve</span></button>
-          <button class="decline-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Decline</span></button>
-        </div>
-      </div>
-    `).join('');
+    reconcileList(body, results, r => r.id, createPendingRequestRow, updatePendingRequestRow);
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not load pending requests.</p>';
   }
@@ -142,30 +181,54 @@ document.getElementById('admin-requests-body').addEventListener('click', async e
   }
 });
 
+function createAdminIssueRow(r) {
+  const row = document.createElement('div');
+  row.className = 'pending-row';
+  row.innerHTML = `
+    <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
+    <div class="result-info">
+      <div class="result-title"></div>
+      <div class="pending-requester">
+        <img src="${r.reportedByAvatar || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
+        <span class="requester-text"></span>
+      </div>
+      <div class="issue-message hidden"></div>
+    </div>
+    <div class="pending-actions">
+      <button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>
+      <button class="approve-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Resolve</span></button>
+    </div>
+  `;
+  return row;
+}
+
+// The click handler below reads straight off this row's own dataset as
+// openReleaseModal/openIssueFileInfo's ctx — every field it could need has
+// to be kept current here on every poll, not just the visibly-displayed
+// text (setting a data-* attribute doesn't touch the <img>, so this stays
+// flicker-free the same way the text-only fields do).
+function updateAdminIssueRow(row, r) {
+  row.dataset.id = r.id;
+  row.dataset.title = r.title || 'Unknown title';
+  row.dataset.mediaType = r.mediaType || '';
+  row.dataset.tmdbId = r.tmdbId || '';
+  row.dataset.tvdbId = r.tvdbId || '';
+  row.dataset.season = r.season || '';
+  row.dataset.episode = r.episode || '';
+  row.dataset.poster = r.poster || '';
+  row.querySelector('.result-title').textContent = (r.title || 'Unknown title') + (r.season ? ` — S${r.season}E${r.episode}` : '');
+  row.querySelector('.requester-text').textContent = `${r.reportedBy} · ${r.issueType} · ${timeAgo(r.reportedAt)}`;
+  const msgEl = row.querySelector('.issue-message');
+  if (r.message) { msgEl.textContent = r.message; msgEl.classList.remove('hidden'); }
+  else msgEl.classList.add('hidden');
+}
+
 async function loadAdminIssues() {
   const body = document.getElementById('admin-issues-body');
   try {
     const results = await api('/api/overseerr/issues/open');
     if (!results.length) { body.innerHTML = '<p class="empty-state">Nothing open.</p>'; return; }
-    body.innerHTML = results.map(r => `
-      <div class="pending-row" data-id="${r.id}" data-title="${escapeHtml(r.title || 'Unknown title')}"
-           data-media-type="${r.mediaType || ''}" data-tmdb-id="${r.tmdbId || ''}" data-tvdb-id="${r.tvdbId || ''}"
-           data-season="${r.season || ''}" data-episode="${r.episode || ''}" data-poster="${r.poster || ''}">
-        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
-        <div class="result-info">
-          <div class="result-title">${escapeHtml(r.title || 'Unknown title')}${r.season ? ` — S${r.season}E${r.episode}` : ''}</div>
-          <div class="pending-requester">
-            <img src="${r.reportedByAvatar || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
-            ${escapeHtml(r.reportedBy)} · ${r.issueType} · ${timeAgo(r.reportedAt)}
-          </div>
-          ${r.message ? `<div class="issue-message">${escapeHtml(r.message)}</div>` : ''}
-        </div>
-        <div class="pending-actions">
-          <button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>
-          <button class="approve-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Resolve</span></button>
-        </div>
-      </div>
-    `).join('');
+    reconcileList(body, results, r => r.id, createAdminIssueRow, updateAdminIssueRow);
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not load issues.</p>';
   }
@@ -701,25 +764,45 @@ document.getElementById('download-issues-body').addEventListener('click', async 
 // flagging it at all: something that prompts the owner to notice, not a
 // second place they'd have to remember to check.
 let wantedResults = [];
+
+// A movie's tmdbId or an episode's tvdbId+season+episode — stable across
+// polls, unlike array position (which reconciling by index would silently
+// break the moment the sort order shifts, e.g. a newly-stuck item jumping
+// to the top).
+function wantedKey(r) {
+  return r.mediaType === 'movie' ? `m${r.tmdbId}` : `e${r.tvdbId}-${r.season}-${r.episode}`;
+}
+
+function createWantedRow() {
+  const row = document.createElement('div');
+  row.className = 'pending-row';
+  row.innerHTML = `
+    <img class="result-poster" loading="lazy" onerror="this.style.visibility='hidden'">
+    <div class="result-info">
+      <div class="result-title"></div>
+      <div class="pending-requester"></div>
+    </div>
+    <div class="pending-actions">
+      <button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>
+    </div>
+  `;
+  return row;
+}
+
+function updateWantedRow(row, r) {
+  const posterImg = row.querySelector('.result-poster');
+  if (posterImg.getAttribute('src') == null) posterImg.src = r.poster || ''; // set once — never touched again
+  row.querySelector('.result-title').textContent = r.title + (r.season ? ` — S${r.season}E${r.episode}` : '');
+  row.querySelector('.pending-requester').innerHTML =
+    `${r.stuck ? '<span class="state-dot danger"></span>' : ''}Released ${formatDate(r.date)}${r.stuck ? ` · ${r.daysSinceRelease}d overdue` : ''}`;
+}
+
 async function loadWanted() {
   const body = document.getElementById('wanted-body');
   try {
     wantedResults = await api('/api/owner/wanted');
     if (!wantedResults.length) { body.innerHTML = '<p class="empty-state">Nothing missing.</p>'; return; }
-    body.innerHTML = wantedResults.map((r, idx) => `
-      <div class="pending-row" data-idx="${idx}">
-        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
-        <div class="result-info">
-          <div class="result-title">${escapeHtml(r.title)}${r.season ? ` — S${r.season}E${r.episode}` : ''}</div>
-          <div class="pending-requester">
-            ${r.stuck ? '<span class="state-dot danger"></span>' : ''}Released ${formatDate(r.date)}${r.stuck ? ` · ${r.daysSinceRelease}d overdue` : ''}
-          </div>
-        </div>
-        <div class="pending-actions">
-          <button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>
-        </div>
-      </div>
-    `).join('');
+    reconcileList(body, wantedResults, wantedKey, createWantedRow, updateWantedRow);
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not load wanted/missing.</p>';
   }
@@ -732,7 +815,7 @@ async function loadWanted() {
 document.getElementById('wanted-body').addEventListener('click', e => {
   const row = e.target.closest('.pending-row');
   if (!row) return;
-  const item = wantedResults[Number(row.dataset.idx)];
+  const item = wantedResults.find(r => wantedKey(r) === row.dataset.reconKey);
   if (!item) return;
   if (e.target.closest('.search-release-btn')) {
     openReleaseModal(item);
@@ -766,6 +849,33 @@ document.getElementById('close-wanted-info-btn').addEventListener('click', () =>
 // Radarr/Sonarr's own queue, filtered (server-side) to items something's
 // actually wrong with — a stuck import, a download client error, etc. —
 // not the whole in-progress queue.
+function createImportIssueRow(r) {
+  const row = document.createElement('div');
+  row.className = 'pending-row';
+  row.innerHTML = `
+    <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
+    <div class="result-info">
+      <div class="result-title"></div>
+      <div class="issue-message"></div>
+    </div>
+    <div class="pending-actions">
+      <button class="force-import-btn pill-btn hidden"><span class="state-dot"></span><span class="btn-label">Force Import</span></button>
+      <button class="remove-queue-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Remove</span></button>
+    </div>
+  `;
+  return row;
+}
+
+function updateImportIssueRow(row, r) {
+  row.dataset.id = r.id;
+  row.dataset.service = r.service;
+  row.dataset.downloadId = r.downloadId || '';
+  row.dataset.title = r.title || 'Unknown title';
+  row.querySelector('.result-title').textContent = r.title || 'Unknown title';
+  row.querySelector('.issue-message').textContent = r.reason;
+  row.querySelector('.force-import-btn').classList.toggle('hidden', !r.downloadId);
+}
+
 async function loadImportIssues() {
   const body = document.getElementById('import-issues-body');
   try {
@@ -775,19 +885,9 @@ async function loadImportIssues() {
     ]);
     const results = [...radarrItems, ...sonarrItems];
     if (!results.length) { body.innerHTML = '<p class="empty-state">No import issues.</p>'; return; }
-    body.innerHTML = results.map(r => `
-      <div class="pending-row" data-id="${r.id}" data-service="${r.service}" data-download-id="${r.downloadId || ''}" data-title="${escapeHtml(r.title || 'Unknown title')}">
-        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
-        <div class="result-info">
-          <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
-          <div class="issue-message">${escapeHtml(r.reason)}</div>
-        </div>
-        <div class="pending-actions">
-          ${r.downloadId ? '<button class="force-import-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Force Import</span></button>' : ''}
-          <button class="remove-queue-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Remove</span></button>
-        </div>
-      </div>
-    `).join('');
+    // service+id, not id alone — Radarr's and Sonarr's queue ids are separate
+    // spaces and could otherwise collide once combined into one list.
+    reconcileList(body, results, r => `${r.service}-${r.id}`, createImportIssueRow, updateImportIssueRow);
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not load import issues.</p>';
   }

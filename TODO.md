@@ -421,4 +421,26 @@
       reason + downloadId returned) and a fully-imported movie (exact real
       file quality/size/codec returned)
 
+- [x] Fixed the same poster-blink bug on the admin page — every poll-
+      refreshed list there (Pending Requests 30s, Open Issues 30s, Wanted/
+      Missing 60s, Import Issues 30s) did a full `innerHTML` rebuild each
+      cycle, recreating every `<img>` from scratch, same root cause as the
+      Now Playing/Recently Watched fix earlier. Added a shared
+      `reconcileList(container, items, keyOf, createRow, updateRow)` helper
+      to admin.js and converted all four — an existing row's `<img>` is now
+      created once and left alone, only text/data-* attributes refresh in
+      place. Wanted/Missing needed a real fix along the way, not just a
+      refactor: its click handler looked items up by array index
+      (`data-idx`), which reconciling by a stable key would have silently
+      broken the moment sort order shifted (e.g. a newly-stuck item jumping
+      to the top) — replaced with a real stable key (tmdbId, or
+      tvdbId+season+episode). Open Issues' click handlers read straight off
+      the row's own `dataset` as context for the release-search/file-info
+      flows, so `updateAdminIssueRow` keeps every field current every poll,
+      not just the visible text. Download Issues/Disk Space/Seeding/
+      Indexers were untouched — no images, nothing to flicker. Verified
+      live: all three underlying endpoints (Open Issues, Wanted/Missing,
+      Sonarr queue) still return data matching exactly what the new render
+      functions expect, clean restart with no new errors
+
 ## Ideas
