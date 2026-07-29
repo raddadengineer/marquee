@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { computeStreak, computeTopWatched, computeRank } = require('../lib/myStats');
+const { computeStreak, computeTopWatched, computeRank, parseActivitySeries } = require('../lib/myStats');
 
 const NOW = new Date('2026-07-27T18:00:00Z').getTime(); // a Monday, 18:00 UTC
 const daysAgoTs = n => Math.floor((NOW - n * 86400000) / 1000); // Tautulli's `date` is unix seconds
@@ -37,8 +37,8 @@ test('computeTopWatched groups episodes under their show and counts each play', 
   ];
   const result = computeTopWatched(rows);
   assert.deepEqual(result, [
-    { ratingKey: 10, title: 'Hana-Kimi', plays: 2 },
-    { ratingKey: 20, title: 'Supergirl', plays: 1 }
+    { title: 'Hana-Kimi', plays: 2 },
+    { title: 'Supergirl', plays: 1 }
   ]);
 });
 
@@ -61,4 +61,26 @@ test('computeRank finds a 1-based position by user_id', () => {
 test('computeRank returns null when the user has no plays in the window', () => {
   const rows = [{ user_id: 5, total_plays: 40 }];
   assert.equal(computeRank(rows, 99), null);
+});
+
+test('parseActivitySeries converts seconds to hours and pairs by category index', () => {
+  const categories = ['Sunday', 'Monday'];
+  const series = [
+    { name: 'TV', data: [5046, 17055] },
+    { name: 'Movies', data: [0, 3600] },
+    { name: 'Live TV', data: [0, 0] }
+  ];
+  assert.deepEqual(parseActivitySeries(categories, series), [
+    { label: 'Sunday', movies: 0, tv: 1.4 },
+    { label: 'Monday', movies: 1, tv: 4.7 }
+  ]);
+});
+
+test('parseActivitySeries defaults to 0 when a series is missing entirely', () => {
+  const categories = ['00', '01'];
+  const series = [{ name: 'TV', data: [3600, 0] }];
+  assert.deepEqual(parseActivitySeries(categories, series), [
+    { label: '00', movies: 0, tv: 1 },
+    { label: '01', movies: 0, tv: 0 }
+  ]);
 });

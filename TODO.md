@@ -301,4 +301,23 @@
       live end-to-end against real data (716 hrs/year, rank #2 of 50, real
       Naruto Shippūden/My Hero Academia/K-ON! posters)
 
+- [x] My Stats, round 2: dropped the Most Watched poster — now one flat
+      gold/silver/bronze list (medal + title + play count) instead of a big
+      #1 poster tile, so the per-item get_metadata round trip is gone
+      entirely (computeTopWatched no longer needs a ratingKey at all). Added
+      a "Watch Activity" section below it — by-day-of-week and by-hour-of-day
+      breakdowns adapted from Tautulli's own Graphs page
+      (get_plays_by_dayofweek/get_plays_by_hourofday, scoped to this user,
+      y_axis=duration), stacked Movies/TV bars with a legend and hover
+      tooltips, bar heights scaled per-chart to that chart's own tallest
+      bucket. Live TV is dropped from the parsed series — this deployment
+      never has any, so Tautulli's own chart would show a permanently-empty
+      third legend entry. Also caught and fixed a real class-name collision:
+      the stat-tile card class silently inherited `flex: 1 1 35%; min-width:
+      90px` from an unrelated pre-existing Admin Seeding-panel rule of the
+      same name — renamed to mystats-tile. Verified live against real data:
+      correct hours/plays/rank, and the day/hour breakdowns cross-check
+      against each other (a single 2h movie session shows up as both
+      Tuesday's 2h Movies bar and hour 13's 2h Movies bar, same session)
+
 ## Ideas

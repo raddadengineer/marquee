@@ -3,7 +3,7 @@ const axios = require('axios');
 const requireAuth = require('./requireAuth');
 const nowPlaying = require('../lib/nowPlaying');
 const { imageUrl } = require('../lib/plexImage');
-const { computeStreak, computeTopWatched, computeRank } = require('../lib/myStats');
+const { computeStreak, computeTopWatched, computeRank, parseActivitySeries } = require('../lib/myStats');
 const router = express.Router();
 
 // Helper: lists every Plex library Tautulli knows about, with its section_id.
@@ -133,17 +133,6 @@ async function fetchSeriesSummary(ratingKey) {
     return data.response.data?.summary || '';
   } catch (e) {
     return '';
-  }
-}
-
-async function fetchThumb(ratingKey) {
-  try {
-    const { data } = await axios.get(`${process.env.TAUTULLI_URL}/api/v2`, {
-      params: { apikey: process.env.TAUTULLI_API_KEY, cmd: 'get_metadata', rating_key: ratingKey }
-    });
-    return data.response.data?.thumb || null;
-  } catch (e) {
-    return null;
   }
 }
 
@@ -277,6 +266,10 @@ router.get('/top-of-month', requireAuth, async (req, res) => {
 // get_home_stats leaderboard. Family rank reuses that same get_home_stats
 // call Top of the Month already relies on, just widened to 365 days and
 // matched against this user's id instead of only taking the top 3.
+// Watch Activity (by day of week / hour of day) reuses Tautulli's own Graphs
+// page endpoints, scoped to this user and to duration instead of play count —
+// their "Live TV" series is dropped in parseActivitySeries since this
+// deployment has no live sessions (always all-zero).
 router.get('/my-stats', requireAuth, async (req, res) => {
   const userId = req.session.user.id;
   try {
@@ -284,10 +277,12 @@ router.get('/my-stats', requireAuth, async (req, res) => {
     const apikey = process.env.TAUTULLI_API_KEY;
     const base = `${process.env.TAUTULLI_URL}/api/v2`;
 
-    const [watchTime, historyRes, homeStats] = await Promise.all([
+    const [watchTime, historyRes, homeStats, dayRes, hourRes] = await Promise.all([
       axios.get(base, { params: { apikey, cmd: 'get_user_watch_time_stats', user_id: userId, query_days: '30,365' } }),
       axios.get(base, { params: { apikey, cmd: 'get_history', user_id: userId, after: oneYearAgo, length: 1000, order_column: 'date', order_dir: 'desc' } }),
-      axios.get(base, { params: { apikey, cmd: 'get_home_stats', time_range: 365, stats_type: 'plays', stats_count: 50 } })
+      axios.get(base, { params: { apikey, cmd: 'get_home_stats', time_range: 365, stats_type: 'plays', stats_count: 50 } }),
+      axios.get(base, { params: { apikey, cmd: 'get_plays_by_dayofweek', user_id: userId, time_range: 30, y_axis: 'duration' } }),
+      axios.get(base, { params: { apikey, cmd: 'get_plays_by_hourofday', user_id: userId, time_range: 30, y_axis: 'duration' } })
     ]);
 
     const windows = watchTime.data.response.data || [];
@@ -296,25 +291,24 @@ router.get('/my-stats', requireAuth, async (req, res) => {
 
     const historyRows = historyRes.data.response.data.data || [];
     const streakDays = computeStreak(historyRows);
-    // get_history has no grandparent_thumb (unlike get_recently_added), so
-    // the real poster is fetched per top-3 result only, same fetch-on-demand
-    // pattern fetchSeriesSummary above already uses for missing overviews.
-    const topGroups = computeTopWatched(historyRows);
-    const topWatched = await Promise.all(topGroups.map(async g => ({
-      title: g.title,
-      plays: g.plays,
-      thumb: imageUrl(await fetchThumb(g.ratingKey))
-    })));
+    const topWatched = computeTopWatched(historyRows);
 
     const topUsersRows = (homeStats.data.response.data || []).find(s => s.stat_id === 'top_users')?.rows || [];
     const position = computeRank(topUsersRows, userId);
+
+    const dayData = dayRes.data.response.data;
+    const hourData = hourRes.data.response.data;
 
     res.json({
       hours: Math.round((yearStats.total_time || 0) / 3600),
       playsThisMonth: monthStats.total_plays || 0,
       streakDays,
       rank: position ? { position, of: topUsersRows.length } : null,
-      topWatched
+      topWatched,
+      activity: {
+        byDay: parseActivitySeries(dayData.categories, dayData.series),
+        byHour: parseActivitySeries(hourData.categories, hourData.series)
+      }
     });
   } catch (err) {
     console.error('tautulli my-stats error:', err.code || err.response?.status, err.message);
