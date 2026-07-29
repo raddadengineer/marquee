@@ -1,6 +1,29 @@
 # Roadmap
 
-## Shipped
+package.json has said `1.1.0` since the batch that first added a version
+footer — everything below `## v1.2.0` shipped after that with no version
+bump at all (13 commits' worth). Grouped here into what those bumps
+should have been, roughly one release per real feature/fix batch (a
+release can bundle several small fixes, same as any normal patch).
+`package.json` has been bumped to match — **current version: v1.4.1**.
+
+## Versions at a glance
+
+- **v1.1.0 and earlier** — foundation: dashboard panels, request/download
+  flow, admin console + Stack tools, security fixes, perf audit, Web Push
+- **v1.2.0** — Releasing Soon "Downloaded" parity, My Stats tab, Watchlist
+  tab removed
+- **v1.2.1** — fix: Now Playing/Recently Watched poster flicker
+- **v1.3.0** — Now Playing live elapsed/ETA counter
+- **v1.3.1** — fix: counter sync accuracy (exact `view_offset`)
+- **v1.4.0** — track a release grab through to done
+- **v1.4.1** — fix batch: admin poster flicker, grab-status timing, Notice
+  Board clipped text, avatar chip label
+
+---
+
+## v1.1.0 and earlier
+
 - [x] Now Playing — live push updates via Plex WebSocket + SSE, header
       shows total bandwidth alongside the stream count (Tautulli's own
       aggregate, not a manual per-session sum)
@@ -275,6 +298,8 @@
       under the original number. Verified live on both pages, correctly
       showing this deployment's site name, the new version, and the year
 
+## v1.2.0 — Releasing Soon parity, My Stats, Watchlist removed
+
 - [x] Releasing Soon now shows a "Downloaded" status label under any movie
       already in the library, matching Airing Today's existing Airing/
       Downloaded pattern — the /api/radarr/upcoming endpoint already
@@ -300,7 +325,6 @@
       get_metadata for just the top-3 results, not every group. Verified
       live end-to-end against real data (716 hrs/year, rank #2 of 50, real
       Naruto Shippūden/My Hero Academia/K-ON! posters)
-
 - [x] My Stats, round 2: dropped the Most Watched poster — now one flat
       gold/silver/bronze list (medal + title + play count) instead of a big
       #1 poster tile, so the per-item get_metadata round trip is gone
@@ -319,7 +343,6 @@
       correct hours/plays/rank, and the day/hour breakdowns cross-check
       against each other (a single 2h movie session shows up as both
       Tuesday's 2h Movies bar and hour 13's 2h Movies bar, same session)
-
 - [x] Removed the Watchlist tab — it only paid off if someone actually used
       Plex's own native watchlist feature outside Marquee, and Search/
       Discover already covers "find something to request." Removed the tab
@@ -329,6 +352,8 @@
       to three tabs (Search / My Requests / My Stats). Verified live:
       `/api/watchlist` now 404s, everything else still responds correctly,
       clean restart with no errors
+
+## v1.2.1 — Fix: Now Playing/Recently Watched poster flicker
 
 - [x] Fixed Now Playing/Recently Watched flickering every ~10s. Root cause:
       `renderNowPlaying` did a full `innerHTML` rebuild on every SSE `full`
@@ -344,6 +369,8 @@
       `patchNowPlayingRow` (the lightweight per-event Plex-push path) was
       untouched aside from re-pointing at the still-separate `.state-word`
       span. Verified live: clean restart, no errors
+
+## v1.3.0 — Now Playing live elapsed/ETA counter
 
 - [x] Now Playing shows elapsed/total runtime + a wall-clock ETA above the
       progress bar (e.g. "10:49 / 23:00 · ETA 9:12 PM"), adapted from
@@ -361,7 +388,6 @@
       Verified the formatting logic by hand against known inputs; live
       verification of the on-screen result still pending an active session
       to check against (none running at deploy time)
-
 - [x] Now Playing's elapsed/total/ETA/bar now tick every second instead of
       only on the ~10s Plex push cadence. Each session gets a `syncedAt`
       timestamp on every real update (both the full snapshot and the
@@ -377,6 +403,8 @@
       than a once-a-second jump. Verified the interpolation math by hand
       (ticks forward correctly while playing, frozen while paused); live
       on-screen verification still pending an active session
+
+## v1.3.1 — Fix: counter sync accuracy
 
 - [x] **Fix**: found the counter was ticking smoothly from a slightly wrong
       starting point. The backend only ever kept a rounded whole-percent
@@ -395,6 +423,8 @@
       `update` stream both now carry the exact value, and that consecutive
       real updates land ~10s apart matching Plex's own push cadence — the
       gap the 1s interpolation ticker is there to smooth over
+
+## v1.4.0 — Track a grab through to done
 
 - [x] Track a grab through to done instead of freezing at "Grabbed ✓". Real
       problem reported: the owner grabbed a replacement release for a
@@ -421,6 +451,8 @@
       reason + downloadId returned) and a fully-imported movie (exact real
       file quality/size/codec returned)
 
+## v1.4.1 — Fix batch: admin flicker, grab timing, Notice Board, avatar label
+
 - [x] Fixed the same poster-blink bug on the admin page — every poll-
       refreshed list there (Pending Requests 30s, Open Issues 30s, Wanted/
       Missing 60s, Import Issues 30s) did a full `innerHTML` rebuild each
@@ -442,7 +474,6 @@
       live: all three underlying endpoints (Open Issues, Wanted/Missing,
       Sonarr queue) still return data matching exactly what the new render
       functions expect, clean restart with no new errors
-
 - [x] **Fix**: grab tracking jumped straight to "Replaced" instead of
       showing Downloading/Importing. Root cause: the "resolve an issue"
       flow exists specifically to replace a file that's already there, so
@@ -459,11 +490,9 @@
       file live: `since=now` correctly returns `unknown` instead of
       `done`; `since=`(a day before the real dateAdded) correctly still
       returns `done`; no `since` at all matches the prior behavior exactly
-
 - [x] Avatar chip subtitle changed from "Signed in" to "My Stats" — the
       chip was already clickable (opens My Stats), but "Signed in" read as
       plain status text with no hint it was tappable. Mocked up first.
-
 - [x] **Fix**: Settings → Notice Board's "Nothing posted right now." was
       visibly clipped at the top. Root cause: `#notice-status-text` reuses
       `.discover-label`'s shared `-0.35rem` top margin (tuned to tuck it
