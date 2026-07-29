@@ -320,4 +320,14 @@
       against each other (a single 2h movie session shows up as both
       Tuesday's 2h Movies bar and hour 13's 2h Movies bar, same session)
 
+- [x] Removed the Watchlist tab — it only paid off if someone actually used
+      Plex's own native watchlist feature outside Marquee, and Search/
+      Discover already covers "find something to request." Removed the tab
+      button + pane, the modalTabs entry and its lazy-load wiring, the
+      `/api/watchlist` route, and `lib/plexWatchlist.js` (Plex Discover API
+      client) entirely — nothing else referenced it. Request modal is back
+      to three tabs (Search / My Requests / My Stats). Verified live:
+      `/api/watchlist` now 404s, everything else still responds correctly,
+      clean restart with no errors
+
 ## Ideas

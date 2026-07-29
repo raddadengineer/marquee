@@ -729,7 +729,6 @@ document.getElementById('close-modal-btn').addEventListener('click', () => {
 const modalTabs = [
   { btn: document.getElementById('tab-search-btn'), pane: document.getElementById('search-tab') },
   { btn: document.getElementById('tab-myrequests-btn'), pane: document.getElementById('myrequests-tab') },
-  { btn: document.getElementById('tab-watchlist-btn'), pane: document.getElementById('watchlist-tab') },
   { btn: document.getElementById('tab-mystats-btn'), pane: document.getElementById('mystats-tab') }
 ];
 function activateTab(btn) {
@@ -741,7 +740,6 @@ function activateTab(btn) {
 }
 
 let myRequestsLoaded = false;
-let watchlistLoaded = false;
 let myStatsLoaded = false;
 
 modalTabs[0].btn.addEventListener('click', () => activateTab(modalTabs[0].btn));
@@ -759,14 +757,6 @@ modalTabs[1].btn.addEventListener('click', () => {
 
 modalTabs[2].btn.addEventListener('click', () => {
   activateTab(modalTabs[2].btn);
-  if (!watchlistLoaded) {
-    watchlistLoaded = true;
-    loadWatchlist();
-  }
-});
-
-modalTabs[3].btn.addEventListener('click', () => {
-  activateTab(modalTabs[3].btn);
   if (!myStatsLoaded) {
     myStatsLoaded = true;
     loadMyStats();
@@ -798,9 +788,9 @@ async function loadMyRequests() {
   }
 }
 
-// Shared by the discover feed, actual search results, and the watchlist tab —
-// same item shape from the backend (lib/overseerrClient.js's mapDiscoverItem),
-// same row markup. Keeps the last-rendered array around per container so a row
+// Shared by the discover feed and actual search results — same item shape
+// from the backend (lib/overseerrClient.js's mapDiscoverItem), same row
+// markup. Keeps the last-rendered array around per container so a row
 // click can look itself up by index and open the info modal with full details
 // before requesting.
 const resultsStore = {};
@@ -840,20 +830,6 @@ async function loadDiscover() {
   }
 }
 
-// The family member's own Plex Watchlist, cross-referenced against Overseerr
-// server-side (routes/watchlist.js) so it renders with the exact same row
-// markup + request flow as search/discover.
-async function loadWatchlist() {
-  const listEl = document.getElementById('watchlist-list');
-  listEl.innerHTML = '<p class="empty-state">Loading…</p>';
-  try {
-    const results = await api('/api/watchlist');
-    renderSearchResults(results, "Nothing on your Plex Watchlist yet.", 'watchlist-list');
-  } catch (e) {
-    listEl.innerHTML = '<p class="empty-state">Could not load your watchlist.</p>';
-  }
-}
-
 let searchTimer;
 document.getElementById('search-input').addEventListener('input', e => {
   clearTimeout(searchTimer);
@@ -870,9 +846,9 @@ document.getElementById('search-input').addEventListener('input', e => {
   }, 400);
 });
 
-// Shared by the search-results and watchlist-list containers — same row
-// markup, same request flow, just a different source list and (for the
-// season picker) a different tab to return to when it closes.
+// Shared by every results container (search results, and — for the season
+// picker — its own return tab) so the same row markup and request flow work
+// regardless of which one triggered it.
 async function handleResultsClick(e, containerId, tabId) {
   const btn = e.target.closest('.request-btn');
   if (btn && !btn.disabled) {
@@ -915,11 +891,10 @@ async function handleResultsClick(e, containerId, tabId) {
   });
 }
 document.getElementById('search-results').addEventListener('click', e => handleResultsClick(e, 'search-results', 'search-tab'));
-document.getElementById('watchlist-list').addEventListener('click', e => handleResultsClick(e, 'watchlist-list', 'watchlist-tab'));
 
 // ---------- Season picker ----------
-// Shown in place of whichever tab (Search or Watchlist) triggered it — returnTabId
-// remembers which one to bring back when the picker closes.
+// Shown in place of whichever tab triggered it — returnTabId remembers which
+// one to bring back when the picker closes.
 let seasonPickerContext = null; // { id, button, returnTabId }
 
 async function openSeasonPicker(id, title, button, returnTabId) {

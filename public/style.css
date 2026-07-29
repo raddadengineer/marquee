@@ -494,7 +494,7 @@ body {
    triggered it) sit in the same flex-column .modal-card, so each needs to be
    a flex column itself (min-height:0 so overflow-y:auto below actually kicks
    in instead of the card just growing past its max-height). */
-#search-tab, #myrequests-tab, #watchlist-tab, #mystats-tab, #season-picker, #report-search-view, #report-browse-view, #report-form-view {
+#search-tab, #myrequests-tab, #mystats-tab, #season-picker, #report-search-view, #report-browse-view, #report-form-view {
   flex: 1; min-height: 0; display: flex; flex-direction: column;
 }
 
