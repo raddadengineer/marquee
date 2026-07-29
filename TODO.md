@@ -1,11 +1,17 @@
 # Roadmap
 
-package.json has said `1.1.0` since the batch that first added a version
-footer — everything below `## v1.2.0` shipped after that with no version
-bump at all (13 commits' worth). Grouped here into what those bumps
-should have been, roughly one release per real feature/fix batch (a
-release can bundle several small fixes, same as any normal patch).
-`package.json` has been bumped to match — **current version: v1.4.1**.
+Every shipped feature or fix gets its own version bump now (`package.json`
++ `package-lock.json`) and its own section here — no more letting the
+version drift unversioned between batches. One bump per shipped unit of
+work: a new capability bumps minor, a fix bumps patch. **Current version:
+v1.4.1.**
+
+`v1.1.0` through `v1.4.1` below are a one-time retroactive reconstruction —
+package.json had said `1.1.0` since the batch that first added a version
+footer, and everything from `v1.2.0` on had actually shipped already with
+no version bump at all (13 commits' worth), so those got grouped into what
+the bumps should have been after the fact. Everything from here forward
+gets versioned as it ships, not reconstructed later.
 
 ## Versions at a glance
 
