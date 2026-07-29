@@ -346,7 +346,10 @@ function renderNowPlaying({ sessions, totalBandwidthKbps }) {
       row.querySelector('.state-dot').className = dotClass(s.state === 'paused');
       row.querySelector('.now-meta-text').textContent = `${s.user || ''} · ${s.quality || ''}`;
       row.querySelector('.state-word').textContent = s.state;
-      row.querySelector('.bar-fill').style.width = s.progress + '%';
+      // syncedAt anchors the per-second interpolation below to this exact
+      // instant, before computing anything off it.
+      s.syncedAt = Date.now();
+      updateNowBar(row, s);
       updateNowEta(row, s);
       body.appendChild(row); // no-op DOM move if already in place — keeps row order matching sessions order
     });
@@ -358,20 +361,49 @@ function renderNowPlaying({ sessions, totalBandwidthKbps }) {
   if (sessionCountChanged) renderRecentlyWatched();
 }
 
+// Both the full snapshot and the lightweight per-event patch only arrive
+// roughly every ~10s during normal playback (Plex's own notification
+// cadence) — without this, the elapsed/total/ETA/bar only ever visibly
+// ticked on that same cadence. Interpolates forward from the last known
+// progress using wall-clock time elapsed since then (see the 1s ticker
+// below), frozen in place whenever the session isn't actively 'playing' so
+// a pause doesn't make it look like time is still passing.
+function interpolatedElapsedMs(s) {
+  const base = (s.durationMs || 0) * (s.progress / 100);
+  if (s.state !== 'playing' || !s.syncedAt) return base;
+  return Math.min(s.durationMs || 0, base + (Date.now() - s.syncedAt));
+}
+
+function updateNowBar(row, s) {
+  const pct = s.durationMs ? Math.min(100, (interpolatedElapsedMs(s) / s.durationMs) * 100) : s.progress;
+  row.querySelector('.bar-fill').style.width = pct + '%';
+}
+
 // Elapsed/total runtime + a wall-clock ETA, shown above the progress bar —
 // both computed client-side from data every session already carries
-// (progress % + durationMs), no new backend field needed. Recomputed on
-// every live update (both the full snapshot and the lightweight per-event
-// patch below) so it stays accurate through pauses rather than just ticking
-// on a fixed timer.
+// (progress % + durationMs), no new backend field needed.
 function updateNowEta(row, s) {
   const el = row.querySelector('.now-eta');
   if (!s.durationMs) { el.textContent = ''; return; }
-  const elapsedMs = s.durationMs * (s.progress / 100);
+  const elapsedMs = interpolatedElapsedMs(s);
   const remainingMs = Math.max(0, s.durationMs - elapsedMs);
   const eta = new Date(Date.now() + remainingMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   el.innerHTML = `${formatDuration(elapsedMs)}<span class="sep">/</span>${formatDuration(s.durationMs)}<span class="sep">·</span>ETA <span class="eta-val">${eta}</span>`;
 }
+
+// Ticks every second so the counter/bar advance smoothly between the real
+// ~10s updates above, instead of visibly jumping once per sync. Sessions
+// that aren't 'playing' are skipped — interpolatedElapsedMs would just
+// return the same frozen value again anyway, so there's nothing to redraw.
+setInterval(() => {
+  for (const s of store.nowPlaying) {
+    if (s.state !== 'playing') continue;
+    const row = document.querySelector(`.now-row[data-session-key="${s.sessionKey}"]`);
+    if (!row) continue;
+    updateNowBar(row, s);
+    updateNowEta(row, s);
+  }
+}, 1000);
 
 function patchNowPlayingRow({ sessionKey, state, progress }) {
   const s = store.nowPlaying.find(x => x.sessionKey === sessionKey);
@@ -379,9 +411,10 @@ function patchNowPlayingRow({ sessionKey, state, progress }) {
   if (!s || !row) return;
   s.state = state;
   s.progress = progress;
+  s.syncedAt = Date.now();
   row.querySelector('.state-dot').classList.toggle('paused', state === 'paused');
   row.querySelector('.state-word').textContent = state;
-  row.querySelector('.bar-fill').style.width = progress + '%';
+  updateNowBar(row, s);
   updateNowEta(row, s);
 }
 

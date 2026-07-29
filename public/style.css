@@ -252,6 +252,10 @@ body {
 .now-eta .sep { opacity: 0.5; margin: 0 0.3em; }
 .now-eta .eta-val { color: var(--text); font-weight: 500; }
 .now-row .bar { margin-top: 2px; }
+/* Smooths the once-a-second interpolated width updates into a continuously
+   advancing bar instead of a visible 1%-per-tick stutter. Scoped to Now
+   Playing only — Download Queue's bar-fill isn't driven by that ticker. */
+.now-row .bar-fill { transition: width 1s linear; }
 
 /* Disk Space panel's per-volume gauge — same amber/danger semantics as
    .bar-fill/.state-dot.danger, just circular instead of linear. pathLength="100"

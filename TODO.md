@@ -362,4 +362,20 @@
       verification of the on-screen result still pending an active session
       to check against (none running at deploy time)
 
+- [x] Now Playing's elapsed/total/ETA/bar now tick every second instead of
+      only on the ~10s Plex push cadence. Each session gets a `syncedAt`
+      timestamp on every real update (both the full snapshot and the
+      lightweight per-event patch); a 1s `setInterval` interpolates forward
+      from the last known progress using wall-clock time since then
+      (`interpolatedElapsedMs`), frozen in place whenever state isn't
+      'playing' so a pause doesn't look like time is still passing. Every
+      real sync resets the anchor, so interpolation drift can't accumulate
+      beyond one sync interval. Bar width now goes through the same
+      interpolated value (`updateNowBar`) instead of the raw synced
+      percentage, with a `transition: width 1s linear` (scoped to
+      `.now-row .bar-fill` only) so it reads as continuous movement rather
+      than a once-a-second jump. Verified the interpolation math by hand
+      (ticks forward correctly while playing, frozen while paused); live
+      on-screen verification still pending an active session
+
 ## Ideas
