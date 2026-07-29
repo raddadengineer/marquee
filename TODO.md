@@ -464,4 +464,15 @@
       chip was already clickable (opens My Stats), but "Signed in" read as
       plain status text with no hint it was tappable. Mocked up first.
 
+- [x] **Fix**: Settings → Notice Board's "Nothing posted right now." was
+      visibly clipped at the top. Root cause: `#notice-status-text` reuses
+      `.discover-label`'s shared `-0.35rem` top margin (tuned to tuck it
+      under the search input in the request modal, its original use) — here
+      it's the first thing inside a scrollable settings tab with nothing
+      above it, so the negative margin pulled the text up past the scroll
+      container's own edge. Scoped override (`#notice-status-text { margin-
+      top: 0; }`) rather than touching the shared class, since the request
+      modal's usage is correct as-is. Verified the fresh cache-busted CSS
+      URL actually serves the fix live.
+
 ## Ideas

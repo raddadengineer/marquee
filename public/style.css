@@ -714,6 +714,11 @@ body {
    since Node only loads .env once at process start. */
 .settings-card { width: min(780px, 94vw); overflow-x: hidden; }
 .settings-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0.5rem 0; }
+/* .discover-label's shared -0.35rem top margin is tuned to tuck it under a
+   search input (its original use) — here it's the first thing in a
+   scrollable settings tab with nothing above it, so that negative margin
+   was clipping the top of the text against the scroll container's edge. */
+#notice-status-text { margin-top: 0; }
 /* wraps instead of squeezing "Run Health Check"/"Edit Deployment Settings"
    into a cramped two-line button next to the heading on narrow screens */
 .settings-section-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.85rem; }
