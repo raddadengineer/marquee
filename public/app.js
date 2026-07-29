@@ -452,6 +452,7 @@ async function loadUpcoming() {
           <span class="poster-badge">${formatDate(i.releaseDate)}</span>
           <div class="poster-overlay"><span class="poster-overlay-text">${escapeHtml(i.title)}</span></div>
         </div>
+        ${i.hasFile ? '<div class="poster-meta">Downloaded</div>' : ''}
       </div>
     `).join('');
   } catch (e) {
