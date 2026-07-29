@@ -330,4 +330,19 @@
       `/api/watchlist` now 404s, everything else still responds correctly,
       clean restart with no errors
 
+- [x] Fixed Now Playing/Recently Watched flickering every ~10s. Root cause:
+      `renderNowPlaying` did a full `innerHTML` rebuild on every SSE `full`
+      event, recreating every `<img>` from scratch — even the safety-net
+      refresh in lib/nowPlaying.js's `setInterval(refresh, 10000)`, which
+      fires whether or not anything actually changed. It also unconditionally
+      called `renderRecentlyWatched()`, fully re-rendering that panel too on
+      the same timer even though its data is only fetched once on page load.
+      Rewrote `renderNowPlaying` to reconcile rows by `sessionKey` instead —
+      an existing row's `<img>` is now created once and left alone for the
+      life of that session, only text/bar-width update in place; Recently
+      Watched only re-renders when the live session count actually changes.
+      `patchNowPlayingRow` (the lightweight per-event Plex-push path) was
+      untouched aside from re-pointing at the still-separate `.state-word`
+      span. Verified live: clean restart, no errors
+
 ## Ideas

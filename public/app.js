@@ -297,31 +297,63 @@ function showAvailableToast({ title, poster }) {
   container.prepend(toast);
 }
 
+// Reconciles by sessionKey instead of replacing the whole list on every
+// update. This panel refreshes on a safety-net timer (see lib/nowPlaying.js)
+// even when nothing actually changed, and a full innerHTML rebuild recreates
+// every <img> from scratch each time — which visibly reloads/flashes the
+// poster even though the same stream is still playing the same thing. An
+// existing row's <img> is now only ever created once, for the duration of
+// that session, and just has its text/bar updated in place after that.
 function renderNowPlaying({ sessions, totalBandwidthKbps }) {
   const body = document.getElementById('now-playing-body');
   const headline = document.getElementById('hero-headline');
   const indicator = document.getElementById('live-indicator');
 
+  const sessionCountChanged = sessions.length !== store.nowPlaying.length;
   store.nowPlaying = sessions;
   const bandwidth = totalBandwidthKbps ? ` · ${(totalBandwidthKbps / 1000).toFixed(1)} Mbps` : '';
   headline.textContent = sessions.length
     ? `${sessions.length} stream${sessions.length === 1 ? '' : 's'} live right now${bandwidth}`
     : 'Nothing playing right now';
   indicator.style.visibility = sessions.length ? 'visible' : 'hidden';
-  body.innerHTML = !sessions.length
-    ? '<p class="empty-state">Nothing playing right now.</p>'
-    : sessions.map((s, idx) => `
-      <div class="now-row" data-idx="${idx}" data-session-key="${s.sessionKey}">
-        <img class="thumb" src="${s.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
-        <div style="flex:1; min-width:0;">
-          <div class="now-title">${escapeHtml(s.title)}</div>
-          <div class="now-meta"><span class="${dotClass(s.state === 'paused')}"></span>${escapeHtml(s.user || '')} · ${s.quality || ''} · <span class="state-word">${s.state}</span></div>
-          <div class="bar"><div class="bar-fill" style="width:${s.progress}%"></div></div>
-        </div>
-      </div>
-    `).join('');
-  // Session count changed — Recently Watched's row count tracks it.
-  renderRecentlyWatched();
+
+  if (!sessions.length) {
+    body.innerHTML = '<p class="empty-state">Nothing playing right now.</p>';
+  } else {
+    if (!body.querySelector('.now-row')) body.innerHTML = ''; // clear the empty-state message
+    const incomingKeys = new Set(sessions.map(s => s.sessionKey));
+    for (const row of body.querySelectorAll('.now-row[data-session-key]')) {
+      if (!incomingKeys.has(row.dataset.sessionKey)) row.remove();
+    }
+    sessions.forEach((s, idx) => {
+      let row = body.querySelector(`.now-row[data-session-key="${s.sessionKey}"]`);
+      if (!row) {
+        row = document.createElement('div');
+        row.className = 'now-row';
+        row.dataset.sessionKey = s.sessionKey;
+        row.innerHTML = `
+          <img class="thumb" src="${s.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
+          <div style="flex:1; min-width:0;">
+            <div class="now-title"></div>
+            <div class="now-meta"><span class="state-dot"></span><span class="now-meta-text"></span> · <span class="state-word"></span></div>
+            <div class="bar"><div class="bar-fill"></div></div>
+          </div>
+        `;
+      }
+      row.dataset.idx = idx;
+      row.querySelector('.now-title').textContent = s.title;
+      row.querySelector('.state-dot').className = dotClass(s.state === 'paused');
+      row.querySelector('.now-meta-text').textContent = `${s.user || ''} · ${s.quality || ''}`;
+      row.querySelector('.state-word').textContent = s.state;
+      row.querySelector('.bar-fill').style.width = s.progress + '%';
+      body.appendChild(row); // no-op DOM move if already in place — keeps row order matching sessions order
+    });
+  }
+
+  // Recently Watched's row count tracks how many streams are live — only
+  // worth re-rendering when that count actually changed, not on every
+  // safety-net refresh (its own data doesn't change on that cadence anyway).
+  if (sessionCountChanged) renderRecentlyWatched();
 }
 
 function patchNowPlayingRow({ sessionKey, state, progress }) {
