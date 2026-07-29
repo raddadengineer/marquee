@@ -1,22 +1,36 @@
 #!/usr/bin/env bash
 # Blocks commits that introduce private/internal IP addresses (RFC1918 ranges)
-# into tracked files. This repo is public — .env.example has leaked real LAN
-# IPs into it before. Actual config/secrets belong only in .env, which is
-# gitignored; anything tracked (README, .env.example, etc.) should use
-# localhost or an example.com-style placeholder instead.
+# or this deployment's real domain into tracked files. This repo is public —
+# .env.example has leaked real LAN IPs before, and skyn3t.me was hardcoded
+# into a test fixture before. Actual config/secrets belong only in .env,
+# which is gitignored; anything tracked (README, .env.example, tests, etc.)
+# should use localhost or an example.com-style placeholder instead.
 set -euo pipefail
 
-pattern='\b(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3})\b'
+staged_additions() {
+  git diff --cached -U0 -- . ':(exclude).env' | grep -E '^\+' | grep -Ev '^\+\+\+'
+}
 
-hits=$(git diff --cached -U0 -- . ':(exclude).env' \
-  | grep -E '^\+' | grep -Ev '^\+\+\+' | grep -E "$pattern" || true)
+ip_pattern='\b(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3})\b'
+ip_hits=$(staged_additions | grep -E "$ip_pattern" || true)
 
-if [ -n "$hits" ]; then
+if [ -n "$ip_hits" ]; then
   echo "pre-commit: private/internal IP address(es) found in staged changes:"
-  echo "$hits"
+  echo "$ip_hits"
   echo
   echo "This repo is public — real LAN IPs shouldn't be committed (use 'localhost'"
   echo "or an example.com-style placeholder instead)."
+  echo "If this is genuinely intentional, commit with --no-verify."
+  exit 1
+fi
+
+domain_hits=$(staged_additions | grep -Ei 'skyn3t\.me' || true)
+
+if [ -n "$domain_hits" ]; then
+  echo "pre-commit: this deployment's real domain (skyn3t.me) found in staged changes:"
+  echo "$domain_hits"
+  echo
+  echo "This repo is public — use 'example.com' or a generic placeholder instead."
   echo "If this is genuinely intentional, commit with --no-verify."
   exit 1
 fi

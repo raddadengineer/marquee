@@ -111,7 +111,8 @@ async function fetchRecentlyAdded(sectionId) {
     if (seasonNum) g.seasons.add(seasonNum);
   }
 
-  return [...groups.values()].slice(0, 10).map(g => {
+  const top = [...groups.entries()].slice(0, 10);
+  return Promise.all(top.map(async ([key, g]) => {
     let title = g.title;
     if (g.eventCount === 1) {
       if (g.singleLabel) title = `${g.title} — ${g.singleLabel}`;
@@ -121,36 +122,25 @@ async function fetchRecentlyAdded(sectionId) {
       const seasons = [...g.seasons];
       title = seasons.length === 1 ? `${g.title} — Season ${seasons[0]}` : `${g.title} — new episodes`;
     }
-    return { title, year: g.year, type: g.type, overview: g.overview, addedAt: g.addedAt, thumb: g.thumb };
-  });
+    // A freshly-aired episode (or a season entry) often has no synopsis of
+    // its own yet — Plex's metadata agent hasn't indexed one within hours of
+    // airing, especially for anime. Same fallback Airing Today already uses
+    // (episode overview -> series overview) rather than showing nothing.
+    let overview = g.overview;
+    if (!overview && !key.startsWith('solo-')) overview = await fetchSeriesSummary(key);
+    return { title, year: g.year, type: g.type, overview, addedAt: g.addedAt, thumb: g.thumb };
+  }));
 }
 
-function parseLibraryConfig() {
-  const custom = process.env.TAUTULLI_LIBRARIES;
-  if (custom && custom.trim()) {
-    const pairs = custom.split(',').map(s => s.trim()).filter(Boolean);
-    const result = [];
-    for (const pair of pairs) {
-      const parts = pair.split(':');
-      if (parts.length >= 2) {
-        const label = parts.slice(0, -1).join(':').trim();
-        const sectionId = parts[parts.length - 1].trim();
-        if (label && sectionId) {
-          const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-          result.push({ key, label, sectionId });
-        }
-      }
-    }
-    if (result.length > 0) return result;
+async function fetchSeriesSummary(ratingKey) {
+  try {
+    const { data } = await axios.get(`${process.env.TAUTULLI_URL}/api/v2`, {
+      params: { apikey: process.env.TAUTULLI_API_KEY, cmd: 'get_metadata', rating_key: ratingKey }
+    });
+    return data.response.data?.summary || '';
+  } catch (e) {
+    return '';
   }
-
-  const { TAUTULLI_SECTION_MOVIES, TAUTULLI_SECTION_TV, TAUTULLI_SECTION_ANIME } = process.env;
-  const legacy = [];
-  if (TAUTULLI_SECTION_MOVIES) legacy.push({ key: 'movies', label: 'Movies', sectionId: TAUTULLI_SECTION_MOVIES });
-  if (TAUTULLI_SECTION_TV) legacy.push({ key: 'tv', label: 'TV Shows', sectionId: TAUTULLI_SECTION_TV });
-  if (TAUTULLI_SECTION_ANIME) legacy.push({ key: 'anime', label: 'Anime', sectionId: TAUTULLI_SECTION_ANIME });
-
-  return legacy;
 }
 
 router.get('/recently-added', requireAuth, async (req, res) => {

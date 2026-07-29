@@ -1,11 +1,13 @@
 const express = require('express');
+const axios = require('axios');
 const requireAuth = require('./requireAuth');
 const requireOwner = require('./requireOwner');
 const settle = require('../lib/settle');
 const uptimeKuma = require('../lib/uptimeKuma');
 const ups = require('../lib/ups');
 const loginLog = require('../lib/loginLog');
-const { isConfigured } = require('../lib/services');
+const { shortestLabelRows } = require('../lib/diskspace');
+const { annotateAndSort } = require('../lib/stuckRequests');
 const router = express.Router();
 
 const fs = require('fs');
@@ -32,285 +34,82 @@ router.get('/logins', requireAuth, requireOwner, async (req, res) => {
   }
 });
 
-const path = require('path');
-
-function updateEnvFile(updates) {
-  const envPaths = [path.join(__dirname, '..', '.env')];
-  const sessionDbDir = process.env.SESSION_DB_DIR || '/app/data';
-  const dataEnvPath = path.join(sessionDbDir, '.env');
-  if (!envPaths.includes(dataEnvPath)) {
-    envPaths.push(dataEnvPath);
-  }
-
-  for (const envPath of envPaths) {
-    try {
-      let content = '';
-      if (fs.existsSync(envPath)) {
-        content = fs.readFileSync(envPath, 'utf8');
-      }
-
-      let lines = content.split('\n');
-      const updatedKeys = new Set();
-
-      lines = lines.map(line => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) return line;
-        const eqIdx = line.indexOf('=');
-        if (eqIdx === -1) return line;
-        const key = line.substring(0, eqIdx).trim();
-        if (Object.prototype.hasOwnProperty.call(updates, key)) {
-          updatedKeys.add(key);
-          return `${key}=${updates[key]}`;
-        }
-        return line;
-      });
-
-      for (const [key, val] of Object.entries(updates)) {
-        if (!updatedKeys.has(key)) {
-          lines.push(`${key}=${val}`);
-        }
-      }
-
-      const dir = path.dirname(envPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
-      fs.writeFileSync(envPath, lines.join('\n'), 'utf8');
-    } catch (err) {
-      console.error(`Error writing env file at ${envPath}:`, err.message);
-    }
-  }
-}
-
-const ALLOWED_CONFIG_KEYS = new Set([
-  'SITE_NAME', 'SITE_TAGLINES', 'HOST_PORT', 'PUBLIC_URL', 'COOKIE_SECURE',
-  'PLEX_SERVER_URL', 'PLEX_ADMIN_TOKEN', 'PLEX_MACHINE_ID', 'PLEX_CLIENT_ID',
-  'TAUTULLI_URL', 'TAUTULLI_API_KEY', 'TAUTULLI_SECTION_MOVIES', 'TAUTULLI_SECTION_TV', 'TAUTULLI_SECTION_ANIME', 'TAUTULLI_LIBRARIES',
-  'OVERSEERR_URL', 'OVERSEERR_API_KEY', 'OVERSEERR_WEBHOOK_SECRET', 'OVERSEERR_WEBHOOK_FORWARD_URL',
-  'SONARR_URL', 'SONARR_API_KEY',
-  'RADARR_URL', 'RADARR_API_KEY',
-  'QBITTORRENT_URL', 'QBITTORRENT_API_KEY', 'QBITTORRENT_USERNAME', 'QBITTORRENT_PASSWORD',
-  'SABNZBD_URL', 'SABNZBD_API_KEY',
-  'UPTIME_KUMA_DB_PATH', 'UPTIME_KUMA_DATA_DIR',
-  'NUT_HOST', 'NUT_PORT', 'NUT_USERNAME', 'NUT_PASSWORD', 'NUT_UPS_NAME'
-]);
-
-router.get('/settings', requireAuth, requireOwner, (req, res) => {
-  const siteName = process.env.SITE_NAME || 'Marquee';
-  const siteTaglines = (process.env.SITE_TAGLINES || 'Uplink to the home network.').split('|').filter(Boolean);
-  const hostPort = process.env.HOST_PORT || 4000;
-  const publicUrl = process.env.PUBLIC_URL || null;
-  const cookieSecure = process.env.COOKIE_SECURE === 'true';
-  const sessionDbDir = process.env.SESSION_DB_DIR || '/app/data';
-  const webhookSecretSet = !!process.env.OVERSEERR_WEBHOOK_SECRET;
-  const webhookForwardUrl = process.env.OVERSEERR_WEBHOOK_FORWARD_URL || null;
-
-  const env = {};
-  for (const k of ALLOWED_CONFIG_KEYS) {
-    env[k] = process.env[k] || '';
-  }
-
-  res.json({
-    siteName,
-    siteTaglines,
-    hostPort,
-    publicUrl,
-    cookieSecure,
-    sessionDbDir,
-    webhookSecretSet,
-    webhookForwardUrl,
-    env,
-    services: {
-      plex: { configured: !!(process.env.PLEX_SERVER_URL && process.env.PLEX_ADMIN_TOKEN), url: process.env.PLEX_SERVER_URL || null },
-      tautulli: { configured: !!(process.env.TAUTULLI_URL && process.env.TAUTULLI_API_KEY), url: process.env.TAUTULLI_URL || null },
-      overseerr: { configured: !!(process.env.OVERSEERR_URL && process.env.OVERSEERR_API_KEY), url: process.env.OVERSEERR_URL || null },
-      sonarr: { configured: !!(process.env.SONARR_URL && process.env.SONARR_API_KEY), url: process.env.SONARR_URL || null },
-      radarr: { configured: !!(process.env.RADARR_URL && process.env.RADARR_API_KEY), url: process.env.RADARR_URL || null },
-      qbittorrent: { configured: !!process.env.QBITTORRENT_URL, url: process.env.QBITTORRENT_URL || null },
-      sabnzbd: { configured: !!(process.env.SABNZBD_URL && process.env.SABNZBD_API_KEY), url: process.env.SABNZBD_URL || null },
-      uptimeKuma: { configured: !!(process.env.UPTIME_KUMA_DB_PATH && fs.existsSync(process.env.UPTIME_KUMA_DB_PATH)) },
-      nutUps: { configured: !!process.env.NUT_HOST, host: process.env.NUT_HOST || null, name: process.env.NUT_UPS_NAME || null }
-    }
+// Monitored movies/episodes that have actually been released but still have
+// no file — i.e. things genuinely worth manually searching for, not stuff
+// that's simply not out yet. The shape returned matches exactly what the
+// release-search modal expects (mediaType/tmdbId or tvdbId+season+episode/
+// title), so "Search" on a row can open it directly with no translation step.
+async function fetchMissingMovies() {
+  const { data } = await axios.get(`${process.env.RADARR_URL}/api/v3/wanted/missing`, {
+    params: { pageSize: 50, sortKey: 'releaseDate', sortDirection: 'descending' },
+    headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
   });
-});
-
-router.post('/settings', requireAuth, requireOwner, (req, res) => {
-  const updates = req.body || {};
-  const validUpdates = {};
-
-  for (const [key, value] of Object.entries(updates)) {
-    if (ALLOWED_CONFIG_KEYS.has(key) && typeof value === 'string') {
-      let valStr = value.trim();
-      if (key.endsWith('_URL') && valStr) {
-        valStr = valStr.replace(/\/+$/, '');
-      }
-      process.env[key] = valStr;
-      validUpdates[key] = valStr;
-    }
-  }
-
-  if (Object.keys(validUpdates).length === 0) {
-    return res.status(400).json({ error: 'No valid setting updates provided' });
-  }
-
-  try {
-    updateEnvFile(validUpdates);
-    res.json({ status: 'ok', updatedKeys: Object.keys(validUpdates) });
-  } catch (err) {
-    console.error('Failed to write .env file:', err);
-    res.status(500).json({ error: 'Failed to persist settings to disk' });
-  }
-});
-
-async function checkServiceHealth(name, fn) {
-  const start = Date.now();
-  try {
-    const res = await fn();
-    const latencyMs = Date.now() - start;
-    return { name, status: 'ok', latencyMs, details: res || null };
-  } catch (err) {
-    const latencyMs = Date.now() - start;
-    return { name, status: 'error', latencyMs, error: err.message };
-  }
+  return data.records
+    .filter(m => m.isAvailable)
+    .map(m => ({
+      mediaType: 'movie',
+      tmdbId: m.tmdbId,
+      title: m.title,
+      overview: m.overview || '',
+      poster: m.images?.find(i => i.coverType === 'poster')?.remoteUrl || null,
+      date: m.releaseDate || m.inCinemas || null
+    }));
 }
 
-router.get('/health', requireAuth, requireOwner, async (req, res) => {
-  const checks = [];
-
-  // Plex
-  if (process.env.PLEX_SERVER_URL && process.env.PLEX_ADMIN_TOKEN) {
-    checks.push(checkServiceHealth('Plex', async () => {
-      const url = process.env.PLEX_SERVER_URL.replace(/\/+$/, '');
-      const { data } = await axios.get(`${url}/identity`, {
-        headers: { 'X-Plex-Token': process.env.PLEX_ADMIN_TOKEN },
-        timeout: 4000
-      });
-      return { version: data?.MediaContainer?.version || 'connected' };
+async function fetchMissingEpisodes() {
+  const { data } = await axios.get(`${process.env.SONARR_URL}/api/v3/wanted/missing`, {
+    params: { pageSize: 50, includeSeries: true, sortKey: 'airDateUtc', sortDirection: 'descending' },
+    headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+  });
+  const now = Date.now();
+  return data.records
+    .filter(e => e.airDateUtc && new Date(e.airDateUtc).getTime() <= now)
+    .map(e => ({
+      mediaType: 'tv',
+      tvdbId: e.series?.tvdbId,
+      season: e.seasonNumber,
+      episode: e.episodeNumber,
+      title: e.series?.title,
+      // Episodes carry no synopsis of their own from this endpoint — only the
+      // series does — and the episode's own title is often still "TBA" for
+      // anything not yet announced in detail.
+      episodeTitle: e.title || null,
+      overview: e.series?.overview || '',
+      poster: e.series?.images?.find(i => i.coverType === 'poster')?.remoteUrl || null,
+      date: e.airDateUtc
     }));
-  } else {
-    checks.push(Promise.resolve({ name: 'Plex', status: 'unconfigured' }));
-  }
+}
 
-  // Tautulli
-  if (process.env.TAUTULLI_URL && process.env.TAUTULLI_API_KEY) {
-    checks.push(checkServiceHealth('Tautulli', async () => {
-      const url = process.env.TAUTULLI_URL.replace(/\/+$/, '');
-      const { data } = await axios.get(`${url}/api/v2`, {
-        params: { cmd: 'get_activity', apikey: process.env.TAUTULLI_API_KEY },
-        timeout: 4000
-      });
-      if (data?.response?.result !== 'success') throw new Error(data?.response?.message || 'Invalid API response');
-      return { connected: true };
-    }));
-  } else {
-    checks.push(Promise.resolve({ name: 'Tautulli', status: 'unconfigured' }));
-  }
+// Sorted most-overdue-first with a `stuck` flag (see lib/stuckRequests.js)
+// on releases that have been out long enough with no file to be worth
+// flagging, rather than a separate list the owner has to think to check.
+router.get('/wanted', requireAuth, requireOwner, async (req, res) => {
+  const [movies, episodes] = await Promise.all([
+    settle('radarr wanted', fetchMissingMovies(), []),
+    settle('sonarr wanted', fetchMissingEpisodes(), [])
+  ]);
+  res.json(annotateAndSort([...movies, ...episodes]));
+});
 
-  // Overseerr
-  if (process.env.OVERSEERR_URL && process.env.OVERSEERR_API_KEY) {
-    checks.push(checkServiceHealth('Overseerr', async () => {
-      const url = process.env.OVERSEERR_URL.replace(/\/+$/, '');
-      const { data } = await axios.get(`${url}/api/v1/status`, {
-        headers: { 'X-Api-Key': process.env.OVERSEERR_API_KEY },
-        timeout: 4000
-      });
-      return { version: data?.version || 'connected' };
-    }));
-  } else {
-    checks.push(Promise.resolve({ name: 'Overseerr', status: 'unconfigured' }));
-  }
-
-  // Sonarr
-  if (process.env.SONARR_URL && process.env.SONARR_API_KEY) {
-    checks.push(checkServiceHealth('Sonarr', async () => {
-      const url = process.env.SONARR_URL.replace(/\/+$/, '');
-      const { data } = await axios.get(`${url}/api/v3/system/status`, {
-        params: { apikey: process.env.SONARR_API_KEY },
-        timeout: 4000
-      });
-      return { version: data?.version || 'connected' };
-    }));
-  } else {
-    checks.push(Promise.resolve({ name: 'Sonarr', status: 'unconfigured' }));
-  }
-
-  // Radarr
-  if (process.env.RADARR_URL && process.env.RADARR_API_KEY) {
-    checks.push(checkServiceHealth('Radarr', async () => {
-      const url = process.env.RADARR_URL.replace(/\/+$/, '');
-      const { data } = await axios.get(`${url}/api/v3/system/status`, {
-        params: { apikey: process.env.RADARR_API_KEY },
-        timeout: 4000
-      });
-      return { version: data?.version || 'connected' };
-    }));
-  } else {
-    checks.push(Promise.resolve({ name: 'Radarr', status: 'unconfigured' }));
-  }
-
-  // qBittorrent
-  if (process.env.QBITTORRENT_URL) {
-    checks.push(checkServiceHealth('qBittorrent', async () => {
-      const url = process.env.QBITTORRENT_URL.replace(/\/+$/, '');
-      const apiKey = process.env.QBITTORRENT_API_KEY;
-      const headers = {
-        Referer: url,
-        Origin: url,
-        ...(apiKey ? {
-          Authorization: `Bearer ${apiKey}`,
-          'X-Api-Key': apiKey,
-          Cookie: `SID=${apiKey}`
-        } : {})
-      };
-      const { data } = await axios.get(`${url}/api/v2/app/version`, {
-        headers,
-        ...(apiKey ? { params: { apikey: apiKey } } : {}),
-        timeout: 4000
-      });
-      return { version: data || 'connected' };
-    }));
-  } else {
-    checks.push(Promise.resolve({ name: 'qBittorrent', status: 'unconfigured' }));
-  }
-
-  // SABnzbd
-  if (process.env.SABNZBD_URL && process.env.SABNZBD_API_KEY) {
-    checks.push(checkServiceHealth('SABnzbd', async () => {
-      const url = process.env.SABNZBD_URL.replace(/\/+$/, '');
-      const { data } = await axios.get(`${url}/api`, {
-        params: { mode: 'version', output: 'json', apikey: process.env.SABNZBD_API_KEY },
-        timeout: 4000
-      });
-      return { version: data?.version || 'connected' };
-    }));
-  } else {
-    checks.push(Promise.resolve({ name: 'SABnzbd', status: 'unconfigured' }));
-  }
-
-  // Uptime Kuma
-  if (process.env.UPTIME_KUMA_DB_PATH && fs.existsSync(process.env.UPTIME_KUMA_DB_PATH)) {
-    checks.push(checkServiceHealth('Uptime Kuma', async () => {
-      const monitors = await uptimeKuma.getMonitors();
-      return { monitorCount: monitors.length };
-    }));
-  } else {
-    checks.push(Promise.resolve({ name: 'Uptime Kuma', status: 'unconfigured' }));
-  }
-
-  // NUT UPS
-  if (process.env.NUT_HOST) {
-    checks.push(checkServiceHealth('NUT UPS', async () => {
-      const status = await ups.getStatus();
-      if (!status) throw new Error('Could not query UPS status');
-      return status;
-    }));
-  } else {
-    checks.push(Promise.resolve({ name: 'NUT UPS', status: 'unconfigured' }));
-  }
-
-  const results = await Promise.all(checks);
-  res.json({ results });
+// Radarr and Sonarr both report every mount point their own container
+// sees — confirmed live that this setup has them sharing several (/,
+// /config, /downloads/completed all report identical byte counts from
+// both services, since they're the same underlying host volumes).
+router.get('/diskspace', requireAuth, requireOwner, async (req, res) => {
+  const [radarr, sonarr] = await Promise.all([
+    settle('radarr diskspace', axios.get(`${process.env.RADARR_URL}/api/v3/diskspace`, {
+      headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
+    }).then(r => r.data), []),
+    settle('sonarr diskspace', axios.get(`${process.env.SONARR_URL}/api/v3/diskspace`, {
+      headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+    }).then(r => r.data), [])
+  ]);
+  const volumes = [...radarr, ...sonarr].map(d => ({
+    label: d.label || d.path,
+    totalBytes: d.totalSpace,
+    freeBytes: d.freeSpace
+  }));
+  res.json(shortestLabelRows(volumes));
 });
 
 module.exports = router;

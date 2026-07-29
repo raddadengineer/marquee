@@ -5,3 +5,9 @@ data
 npm-debug.log*
 .DS_Store
 ._*
+
+# Synology NAS storage integration — deployment-local only, reveals real host
+# paths/share layout, never committed/pushed (see TODO.md's Shipped notes on
+# the Disk Space feature)
+lib/mediaStorage.js
+test/mediaStorage.test.js

@@ -3,12 +3,6 @@ const dashboardScreen = document.getElementById('dashboard-screen');
 const signinStatus = document.getElementById('signin-status');
 const store = { nowPlaying: [], recentlyWatched: [], recentlyAdded: [], airingToday: [], upcoming: [] };
 
-async function api(path, opts = {}) {
-  const res = await fetch(path, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
-  return res.json();
-}
-
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
@@ -84,93 +78,74 @@ function pollSignIn(popup) {
   }
 })();
 
-async function checkSigninConfig() {
-  try {
-    const cfg = await api('/api/auth/config');
-    store.services = cfg.services || {};
-    const btn = document.getElementById('plex-signin-btn');
-    if (cfg.services && !cfg.services.plex) {
-      btn.disabled = true;
-      btn.classList.add('disabled');
-      signinStatus.textContent = 'Plex server is not configured. Ask server owner to configure Plex settings.';
-    }
-  } catch {}
-}
+let isOwner = false;
 
-function applyServiceVisibility(services = store.services || {}) {
-  const toggle = (id, enabled) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (enabled) el.classList.remove('hidden');
-    else el.classList.add('hidden');
-  };
-
-  // Disable (hide) bento grid panels for unconfigured apps
-  toggle('panel-now-playing', !!services.tautulli);
-  toggle('panel-recently-watched', !!services.tautulli);
-  toggle('panel-top-month', !!services.tautulli);
-  toggle('panel-recently-added', !!services.tautulli);
-  toggle('panel-airing-today', !!services.sonarr);
-  toggle('panel-upcoming', !!services.radarr);
-  toggle('panel-downloads', !!services.downloads);
-
-  // Request feature buttons
-  toggle('search-btn', !!services.overseerr);
-  toggle('fab-request-btn', !!services.overseerr);
-
-  // Report issue feature buttons
-  const canReport = !!(services.plex && services.overseerr);
-  toggle('report-search-btn', canReport);
-  toggle('fab-report-btn', canReport);
-}
-
-function showDashboard(isOwner, services = {}) {
-  store.services = services;
+function showDashboard(owner) {
+  isOwner = owner;
   signinScreen.classList.add('hidden');
   dashboardScreen.classList.remove('hidden');
   setHeroDate();
-  applyServiceVisibility(services);
-  initHeroBanners(services);
+  loadNotice();
+  loadHeroBanners();
+  connectNowPlayingStream();
+  loadRecentlyWatched();
+  loadTopOfMonth();
+  loadRecentlyAdded();
+  loadAiringToday();
+  loadUpcoming();
+  loadDownloads();
+  setInterval(loadDownloads, 5000);
+  // Everything owner-only (sign-ins, pending requests, issues, system status,
+  // stack management) lives on its own page now instead of crowding this one.
+  document.getElementById('admin-link-btn').classList.toggle('hidden', !isOwner);
+  initNotifyToggle();
+}
 
-  if (services.tautulli) {
-    connectNowPlayingStream();
-    loadRecentlyWatched();
-    loadTopOfMonth();
-    loadRecentlyAdded();
-  }
-  if (services.sonarr) {
-    loadAiringToday();
-  }
-  if (services.radarr) {
-    loadUpcoming();
-  }
-  if (services.downloads) {
-    loadDownloads();
-    setInterval(loadDownloads, 5000);
-  }
-  if (isOwner) {
-    document.getElementById('admin-settings-btn').classList.remove('hidden');
-    if (services.systemStatus) {
-      document.getElementById('panel-owner').classList.remove('hidden');
-      loadOwnerStatus();
-      setInterval(loadOwnerStatus, 15000);
-    } else {
-      document.getElementById('panel-owner').classList.add('hidden');
+// ---------- Push notifications ----------
+// "Available now" pushes (see lib/pushNotify.js) reach this device even
+// without a tab open, unlike the SSE toast they mirror. Button stays hidden
+// entirely if this deployment has no VAPID key configured, or the browser
+// doesn't support Push at all — same graceful-absence pattern as every other
+// optional integration in this app.
+async function initNotifyToggle() {
+  const btn = document.getElementById('notify-toggle-btn');
+  if (!window.VAPID_PUBLIC_KEY || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  btn.classList.remove('hidden');
+
+  const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+  btn.classList.toggle('active', !!existing);
+
+  btn.addEventListener('click', async () => {
+    const reg = await navigator.serviceWorker.ready;
+    const current = await reg.pushManager.getSubscription();
+    if (current) {
+      await current.unsubscribe();
+      await api('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: current.endpoint }) });
+      btn.classList.remove('active');
+      return;
     }
-    document.getElementById('panel-admin').classList.remove('hidden');
-    loadAdminLogins();
-    if (services.overseerr) {
-      loadPendingRequests();
-      setInterval(loadPendingRequests, 30000);
-      loadAdminIssues();
-      setInterval(loadAdminIssues, 30000);
-    } else {
-      setDualHTML('admin-requests-body', 'modal-admin-requests-body', '<p class="empty-state">Overseerr is not configured.</p>');
-      setDualHTML('admin-issues-body', 'modal-admin-issues-body', '<p class="empty-state">Overseerr is not configured.</p>');
+    if (Notification.permission === 'denied') {
+      alert('Notifications are blocked for this site in your browser settings.');
+      return;
     }
-    loadServerSettings();
-    loadServiceHealth();
-  }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(window.VAPID_PUBLIC_KEY)
+    });
+    await api('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+    btn.classList.add('active');
+  });
+}
+
+// Web Push's applicationServerKey needs a Uint8Array — VAPID public keys are
+// handed out base64url-encoded, this is the standard conversion (same as
+// MDN's own push notification guide).
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
 
 function setHeroDate() {
@@ -179,7 +154,107 @@ function setHeroDate() {
   document.getElementById('date-txt').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short' });
 }
 
+// ---------- Notice board ----------
+// Owner-scheduled announcement (e.g. planned maintenance) — checked once on
+// load, not pushed live; the scheduling use case (e.g. "starts Monday 9am")
+// doesn't need it to appear mid-session without a refresh.
+async function loadNotice() {
+  const banner = document.getElementById('notice-banner');
+  try {
+    const notice = await api('/api/notice');
+    if (notice) {
+      document.getElementById('notice-banner-text').textContent = notice.message;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  } catch (e) {
+    banner.classList.add('hidden');
+  }
+}
+
+// ---------- Hero backdrop banner ----------
+// Cycles through wide backdrop images behind the header, sourced from
+// Overseerr's trending/discover feed (same data already used by the request
+// modal's default view). Falls back to this month's top movie/TV/anime
+// posters if Overseerr isn't configured/reachable or has nothing with a
+// backdrop — a portrait poster in a landscape slot isn't ideal, but it's a
+// reasonable degrade rather than showing nothing.
+let heroBanners = [];
+let heroBannerIndex = 0;
+let heroBannerTimer = null;
+
+async function loadHeroBanners() {
+  let items = [];
+  try {
+    const discover = await api('/api/overseerr/discover');
+    items = discover.filter(i => i.backdrop);
+  } catch (e) { /* Overseerr not configured/reachable — fall through below */ }
+
+  if (!items.length) {
+    try {
+      const top = await api('/api/tautulli/top-of-month');
+      items = [top.movie?.[0], top.tv?.[0], top.anime?.[0]]
+        .filter(i => i && i.thumb)
+        .map(i => ({ backdrop: i.thumb, title: i.title }));
+    } catch (e) { /* nothing to show — banner just stays off */ }
+  }
+
+  heroBanners = items;
+  heroBannerIndex = Math.floor(Math.random() * heroBanners.length);
+  if (heroBannerTimer) { clearInterval(heroBannerTimer); heroBannerTimer = null; }
+  if (!heroBanners.length) return;
+
+  showHeroBanner(heroBanners[heroBannerIndex]);
+  if (heroBanners.length > 1) {
+    heroBannerTimer = setInterval(() => {
+      // Random, but never repeat the slide currently on screen.
+      let next;
+      do {
+        next = Math.floor(Math.random() * heroBanners.length);
+      } while (next === heroBannerIndex);
+      heroBannerIndex = next;
+      showHeroBanner(heroBanners[heroBannerIndex]);
+    }, 12000);
+  }
+}
+
+function showHeroBanner(item) {
+  const slideA = document.querySelector('#hero-bg .slide-a');
+  const slideB = document.querySelector('#hero-bg .slide-b');
+  if (!slideA || !slideB || !item) return;
+  const active = slideA.classList.contains('active') ? slideA : slideB;
+  const inactive = active === slideA ? slideB : slideA;
+  // Preload before swapping — crossfading onto a half-downloaded image looks
+  // broken, and the currently-visible slide just stays put until this loads.
+  const img = new Image();
+  img.onload = () => {
+    inactive.style.backgroundImage = `url("${item.backdrop}")`;
+    active.classList.remove('active');
+    inactive.classList.add('active');
+  };
+  img.src = item.backdrop;
+
+  const tag = document.getElementById('hero-featured-tag');
+  const label = item.year ? `${item.title} (${item.year})` : item.title;
+  tag.textContent = `FEATURED · ${label}`;
+  tag.classList.remove('hidden');
+  // Only Overseerr-sourced items (which carry an id) have enough data for the
+  // info modal's Request flow — the top-of-month fallback doesn't, so its
+  // tag is just a label, not a click target.
+  tag.onclick = item.id ? () => openInfo({
+    poster: item.poster || item.backdrop,
+    title: item.title,
+    badge: item.mediaType === 'tv' ? 'SERIES' : 'MOVIE',
+    meta: item.year || '',
+    overview: item.overview,
+    request: item
+  }) : null;
+  tag.style.cursor = item.id ? 'pointer' : 'default';
+}
+
 document.getElementById('logout-btn').addEventListener('click', async () => {
+  if (!await confirmDialog('Sign out?')) return;
   await api('/api/auth/logout', { method: 'POST' });
   location.reload();
 });
@@ -208,7 +283,7 @@ function showAvailableToast({ title, poster }) {
   const toast = document.createElement('div');
   toast.className = 'toast';
   toast.innerHTML = `
-    <img class="toast-poster" src="${poster || ''}" onerror="this.style.visibility='hidden'">
+    <img class="toast-poster" src="${poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
     <div class="toast-body">
       <div class="toast-eyebrow">Available now</div>
       <div class="toast-title">${escapeHtml(title || 'A request')}</div>
@@ -222,125 +297,22 @@ function showAvailableToast({ title, poster }) {
   setTimeout(dismiss, 8000);
 }
 
-// ---------- Hero Backdrop Banners ----------
-let heroBanners = [];
-let heroBannerIndex = 0;
-let heroBannerTimer = null;
-
-async function initHeroBanners(services = {}) {
-  if (heroBannerTimer) {
-    clearInterval(heroBannerTimer);
-    heroBannerTimer = null;
-  }
-  heroBanners = [];
-  heroBannerIndex = 0;
-
-  if (services.overseerr) {
-    try {
-      const items = await api('/api/overseerr/discover');
-      heroBanners = (items || []).filter(i => i && i.backdrop);
-    } catch (e) {
-      console.warn('Could not load Overseerr discover items for hero background', e);
-    }
-  }
-
-  if (!heroBanners.length) {
-    const pool = [];
-    if (store.recentlyAdded && store.recentlyAdded.all) {
-      pool.push(...store.recentlyAdded.all);
-    }
-    if (store.topOfMonth && Array.isArray(store.topOfMonth)) {
-      pool.push(...store.topOfMonth);
-    }
-    heroBanners = pool
-      .map(i => ({
-        backdrop: i.art || i.thumb || i.poster,
-        title: i.title || i.name,
-        year: i.year || ''
-      }))
-      .filter(i => i.backdrop);
-  }
-
-  if (!heroBanners.length) return;
-
-  const slideA = document.querySelector('#hero-bg .slide-a');
-  const slideB = document.querySelector('#hero-bg .slide-b');
-  if (!slideA || !slideB) return;
-
-  const initial = heroBanners[0];
-  const img = new Image();
-  img.onload = () => {
-    slideA.style.backgroundImage = `url("${initial.backdrop}")`;
-    slideA.classList.add('active');
-    slideB.classList.remove('active');
-    updateHeroFeaturedTag(initial);
-  };
-  img.src = initial.backdrop;
-
-  if (heroBanners.length > 1) {
-    heroBannerTimer = setInterval(rotateHeroBanner, 12000);
-  }
-}
-
-function rotateHeroBanner() {
-  if (!heroBanners.length) return;
-  const nextIndex = (heroBannerIndex + 1) % heroBanners.length;
-  const slideA = document.querySelector('#hero-bg .slide-a');
-  const slideB = document.querySelector('#hero-bg .slide-b');
-  if (!slideA || !slideB) return;
-
-  const activeSlide = slideA.classList.contains('active') ? slideA : slideB;
-  const inactiveSlide = activeSlide === slideA ? slideB : slideA;
-
-  const item = heroBanners[nextIndex];
-  const img = new Image();
-  img.onload = () => {
-    inactiveSlide.style.backgroundImage = `url("${item.backdrop}")`;
-    activeSlide.classList.remove('active');
-    inactiveSlide.classList.add('active');
-    updateHeroFeaturedTag(item);
-    heroBannerIndex = nextIndex;
-  };
-  img.src = item.backdrop;
-}
-
-function updateHeroFeaturedTag(item) {
-  const tag = document.getElementById('hero-featured-tag');
-  if (!tag || !item) return;
-  const label = item.year ? `${escapeHtml(item.title)} (${item.year})` : escapeHtml(item.title);
-  tag.innerHTML = `<span style="opacity:0.65;font-weight:600;letter-spacing:0.04em;">FEATURED BACKDROP</span> &bull; ${label} &nbsp;&#8594;`;
-  tag.classList.remove('hidden');
-}
-
-document.getElementById('hero-featured-tag').addEventListener('click', () => {
-  if (!heroBanners.length) return;
-  const currentItem = heroBanners[heroBannerIndex];
-  if (!currentItem) return;
-  openInfo({
-    poster: currentItem.poster || currentItem.backdrop,
-    title: currentItem.title,
-    badge: currentItem.mediaType === 'tv' ? 'FEATURED SERIES' : 'FEATURED MOVIE',
-    meta: currentItem.year || '',
-    overview: currentItem.overview,
-    request: currentItem
-  });
-});
-
-function renderNowPlaying(sessions) {
+function renderNowPlaying({ sessions, totalBandwidthKbps }) {
   const body = document.getElementById('now-playing-body');
   const headline = document.getElementById('hero-headline');
   const indicator = document.getElementById('live-indicator');
 
   store.nowPlaying = sessions;
+  const bandwidth = totalBandwidthKbps ? ` · ${(totalBandwidthKbps / 1000).toFixed(1)} Mbps` : '';
   headline.textContent = sessions.length
-    ? `${sessions.length} stream${sessions.length === 1 ? '' : 's'} live right now`
+    ? `${sessions.length} stream${sessions.length === 1 ? '' : 's'} live right now${bandwidth}`
     : 'Nothing playing right now';
   indicator.style.visibility = sessions.length ? 'visible' : 'hidden';
   body.innerHTML = !sessions.length
     ? '<p class="empty-state">Nothing playing right now.</p>'
     : sessions.map((s, idx) => `
       <div class="now-row" data-idx="${idx}" data-session-key="${s.sessionKey}">
-        <img class="thumb" src="${s.thumb || ''}" onerror="this.style.visibility='hidden'">
+        <img class="thumb" src="${s.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div style="flex:1; min-width:0;">
           <div class="now-title">${escapeHtml(s.title)}</div>
           <div class="now-meta"><span class="${dotClass(s.state === 'paused')}"></span>${escapeHtml(s.user || '')} · ${s.quality || ''} · <span class="state-word">${s.state}</span></div>
@@ -389,7 +361,7 @@ function renderRecentlyWatched() {
   if (!items.length) { body.innerHTML = '<p class="empty-state">Nothing watched recently.</p>'; return; }
   body.innerHTML = items.map((i, idx) => `
     <div class="now-row" data-idx="${idx}">
-      <img class="thumb" src="${i.thumb || ''}" onerror="this.style.visibility='hidden'">
+      <img class="thumb" src="${i.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
       <div style="flex:1; min-width:0;">
         <div class="now-title">${escapeHtml(i.title)}</div>
         <div class="now-meta">
@@ -436,7 +408,7 @@ async function loadRecentlyAdded() {
         ${s.items.slice(0, cap).map((i, idx) => `
           <div class="poster-card" data-cat="${s.key}" data-idx="${idx}">
             <div class="poster-frame">
-              <img class="poster-img" src="${i.thumb || ''}" onerror="this.style.visibility='hidden'">
+              <img class="poster-img" src="${i.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
               <span class="poster-badge">${timeAgo(i.addedAt)}</span>
               <div class="poster-overlay"><span class="poster-overlay-text">${escapeHtml(i.title)}</span></div>
             </div>
@@ -459,7 +431,7 @@ async function loadAiringToday() {
     body.innerHTML = items.map((i, idx) => `
       <div class="poster-card" data-idx="${idx}">
         <div class="poster-frame">
-          <img class="poster-img" src="${i.poster || ''}" onerror="this.style.visibility='hidden'">
+          <img class="poster-img" src="${i.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
           <span class="poster-badge">${i.episode}</span>
           <div class="poster-overlay"><span class="poster-overlay-text">${escapeHtml(i.series)}</span></div>
         </div>
@@ -481,7 +453,7 @@ async function loadUpcoming() {
     body.innerHTML = items.map((i, idx) => `
       <div class="poster-card" data-idx="${idx}">
         <div class="poster-frame">
-          <img class="poster-img" src="${i.poster || ''}" onerror="this.style.visibility='hidden'">
+          <img class="poster-img" src="${i.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
           <span class="poster-badge">${formatDate(i.releaseDate)}</span>
           <div class="poster-overlay"><span class="poster-overlay-text">${escapeHtml(i.title)}</span></div>
         </div>
@@ -494,13 +466,18 @@ async function loadUpcoming() {
 }
 
 // ---------- Download Queue ----------
+// Actively downloading only, for everyone — anything stuck (paused, stalled,
+// errored) is an owner-only concern, see admin.js's "Download Issues"
+// section instead. Most of what "stuck" would otherwise include here is just
+// fully-downloaded torrents idling before/during seeding, which nobody
+// browsing this panel needs to see.
 async function loadDownloads() {
   const body = document.getElementById('downloads-body');
   try {
     const items = await api('/api/downloads/queue');
     if (!items.length) { body.innerHTML = '<p class="empty-state">Nothing downloading.</p>'; return; }
     body.innerHTML = items.map(d => `
-      <div class="dl-row">
+      <div class="dl-row${d.type === 'torrent' ? ' dl-row-clickable' : ''}"${d.type === 'torrent' ? ` data-hash="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name)}"` : ''}>
         <div class="dl-row-body">
           <div class="now-title">${escapeHtml(d.name)}</div>
           <div class="now-meta">
@@ -509,6 +486,11 @@ async function loadDownloads() {
           </div>
           <div class="bar"><div class="bar-fill" style="width:${d.progress}%"></div></div>
         </div>
+        ${isOwner && d.type === 'torrent' ? `
+          <button class="dl-remove-btn pill-btn">
+            <span class="state-dot danger"></span><span class="btn-label">Remove</span>
+          </button>
+        ` : ''}
       </div>
     `).join('');
   } catch (e) {
@@ -516,15 +498,68 @@ async function loadDownloads() {
   }
 }
 
-function formatSpeed(kbps) {
-  return kbps >= 1024 ? `${(kbps / 1024).toFixed(1)} MB/s` : `${kbps} KB/s`;
+// Delegated so it keeps working across loadDownloads' re-renders every 5s
+// instead of needing listeners re-attached each poll.
+document.getElementById('downloads-body').addEventListener('click', async e => {
+  const removeBtn = e.target.closest('.dl-remove-btn');
+  if (removeBtn) {
+    const row = removeBtn.closest('.dl-row');
+    if (!await confirmDialog('Remove this download and delete any downloaded files?')) return;
+    row.querySelectorAll('button').forEach(b => b.disabled = true);
+    removeBtn.querySelector('.btn-label').textContent = '…';
+    try {
+      await api(`/api/downloads/queue/torrent/${encodeURIComponent(row.dataset.hash)}`, { method: 'DELETE' });
+      row.remove();
+      if (!document.getElementById('downloads-body').children.length) {
+        document.getElementById('downloads-body').innerHTML = '<p class="empty-state">Nothing downloading.</p>';
+      }
+    } catch (err) {
+      row.querySelectorAll('button').forEach(b => b.disabled = false);
+      removeBtn.querySelector('.btn-label').textContent = 'Remove';
+    }
+    return;
+  }
+
+  const row = e.target.closest('.dl-row-clickable');
+  if (row) openTorrentDetails(row.dataset.hash, row.dataset.name);
+});
+
+const torrentModal = document.getElementById('torrent-modal');
+
+async function openTorrentDetails(hash, name) {
+  torrentModal.classList.remove('hidden');
+  const statsEl = document.getElementById('torrent-details-stats');
+  const filesEl = document.getElementById('torrent-details-files');
+  document.getElementById('torrent-details-title').textContent = name || '';
+  statsEl.innerHTML = '';
+  filesEl.innerHTML = '<p class="empty-state">Loading…</p>';
+  try {
+    const d = await api(`/api/downloads/queue/torrent/${encodeURIComponent(hash)}/details`);
+    const rows = [
+      ['Seeds', `${d.seeds} (${d.seedsTotal} total)`],
+      ['Peers', `${d.peers} (${d.peersTotal} total)`],
+      ['Connections', `${d.connections}${d.connectionsLimit > 0 ? ' / ' + d.connectionsLimit : ''}`],
+      ['Speed', `↓ ${formatSpeed(d.downloadSpeedKbps)} · ↑ ${formatSpeed(d.uploadSpeedKbps)}`],
+      ['ETA', d.etaSeconds != null ? formatEta(d.etaSeconds) : 'Unknown'],
+      ['Ratio', d.ratio != null ? d.ratio.toFixed(2) : 'Unknown'],
+      ['Size', formatBytes(d.sizeBytes)],
+      ['Save Path', d.savePath || 'Unknown']
+    ];
+    statsEl.innerHTML = rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd>`).join('');
+    filesEl.innerHTML = d.files.map(f => `
+      <div class="torrent-file-row">
+        <div class="now-title">${escapeHtml(f.name)}</div>
+        <div class="now-meta">${formatBytes(f.sizeBytes)} · ${f.progress}%</div>
+        <div class="bar"><div class="bar-fill" style="width:${f.progress}%"></div></div>
+      </div>
+    `).join('');
+  } catch (e) {
+    filesEl.innerHTML = '<p class="empty-state">Could not load torrent details.</p>';
+  }
 }
 
-function formatEta(seconds) {
-  if (seconds >= 3600) return `${Math.round(seconds / 3600)}h left`;
-  if (seconds >= 60) return `${Math.round(seconds / 60)}m left`;
-  return `${seconds}s left`;
-}
+document.getElementById('close-torrent-btn').addEventListener('click', () => torrentModal.classList.add('hidden'));
+torrentModal.addEventListener('click', e => { if (e.target === torrentModal) torrentModal.classList.add('hidden'); });
 
 // ---------- Top of the Month ----------
 async function loadTopOfMonth() {
@@ -553,7 +588,7 @@ function renderTopMonthTile(label, items, isUser) {
   if (!items || !items.length) {
     return `
       <div class="top-month-tile ${isUser ? 'user' : ''}">
-        <div class="top-month-frame"><img class="top-month-img" src="" onerror="this.style.visibility='hidden'"></div>
+        <div class="top-month-frame"><img class="top-month-img" src="" loading="lazy" onerror="this.style.visibility='hidden'"></div>
         <div class="top-month-label">${label}</div>
         <div class="empty-state">No data yet</div>
       </div>
@@ -570,7 +605,7 @@ function renderTopMonthTile(label, items, isUser) {
   return `
     <div class="top-month-tile ${isUser ? 'user' : ''}">
       <span class="top-month-medal">🥇</span>
-      <div class="top-month-frame"><img class="top-month-img" src="${(isUser ? first.avatar : first.thumb) || ''}" onerror="this.style.visibility='hidden'"></div>
+      <div class="top-month-frame"><img class="top-month-img" src="${(isUser ? first.avatar : first.thumb) || ''}" loading="lazy" onerror="this.style.visibility='hidden'"></div>
       <div class="top-month-label">${label}</div>
       <div class="top-month-title">${escapeHtml(first.name || first.title)}</div>
       <div class="top-month-plays">${first.plays} play${first.plays === 1 ? '' : 's'}</div>
@@ -580,642 +615,6 @@ function renderTopMonthTile(label, items, isUser) {
       </div>
     </div>
   `;
-}
-
-function setDualHTML(id1, id2, html) {
-  const el1 = document.getElementById(id1);
-  const el2 = document.getElementById(id2);
-  if (el1) el1.innerHTML = html;
-  if (el2) el2.innerHTML = html;
-}
-
-// ---------- Owner Status (owner only — Uptime Kuma + UPS) ----------
-async function loadOwnerStatus() {
-  try {
-    const { monitors, ups } = await api('/api/owner/status');
-    let html = '';
-    if (ups) {
-      const onBattery = ups.status.includes('OB');
-      html += `
-        <div class="ups-status">
-          <div class="now-title">${escapeHtml(ups.model || 'UPS')}</div>
-          <div class="now-meta">
-            <span class="${dotClass(onBattery)}"></span>
-            ${escapeHtml(formatUpsStatus(ups.status))}${ups.loadPercent != null ? ' · ' + ups.loadPercent + '% load' : ''}${ups.batteryRuntimeSeconds != null ? ' · ' + formatEta(ups.batteryRuntimeSeconds) + ' runtime' : ''}
-          </div>
-          ${ups.batteryChargePercent != null ? `<div class="bar"><div class="bar-fill" style="width:${ups.batteryChargePercent}%"></div></div>` : ''}
-        </div>
-      `;
-    }
-    if (monitors.length) {
-      html += `<div class="monitor-pills">${monitors.map(m => `
-        <span class="monitor-pill ${m.status}"><span class="${dotClass(m.status !== 'up')}"></span>${escapeHtml(m.name)}</span>
-      `).join('')}</div>`;
-    }
-    setDualHTML('owner-body', 'modal-owner-body', html || '<p class="empty-state">Nothing configured.</p>');
-  } catch (e) {
-    setDualHTML('owner-body', 'modal-owner-body', '<p class="empty-state">Could not reach status sources.</p>');
-  }
-}
-
-// ---------- Admin panel (owner only) ----------
-async function loadAdminLogins() {
-  try {
-    const logins = await api('/api/owner/logins');
-    const html = !logins.length ? '<p class="empty-state">No sign-ins recorded yet.</p>' : logins.map(l => `
-      <div class="login-row">
-        <img class="login-avatar" src="${l.thumb || ''}" onerror="this.style.visibility='hidden'">
-        <div>
-          <div class="login-name">${escapeHtml(l.username)}${l.isOwner ? ' · Owner' : ''}</div>
-          <div class="login-time">${timeAgo(l.at)}</div>
-        </div>
-      </div>
-    `).join('');
-    setDualHTML('admin-logins-body', 'modal-admin-logins-body', html);
-  } catch (e) {
-    setDualHTML('admin-logins-body', 'modal-admin-logins-body', '<p class="empty-state">Could not load sign-ins.</p>');
-  }
-}
-
-async function loadPendingRequests() {
-  try {
-    const results = await api('/api/overseerr/requests/pending');
-    if (!results.length) {
-      setDualHTML('admin-requests-body', 'modal-admin-requests-body', '<p class="empty-state">Nothing pending.</p>');
-      return;
-    }
-    const html = results.map(r => `
-      <div class="pending-row" data-id="${r.id}">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
-        <div class="result-info">
-          <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
-          <div class="pending-requester">
-            <img src="${r.requestedByAvatar || ''}" onerror="this.style.visibility='hidden'">
-            ${escapeHtml(r.requestedBy)} · ${timeAgo(r.requestedAt)}
-          </div>
-        </div>
-        <div class="pending-actions">
-          <button class="approve-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Approve</span></button>
-          <button class="decline-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Decline</span></button>
-        </div>
-      </div>
-    `).join('');
-    setDualHTML('admin-requests-body', 'modal-admin-requests-body', html);
-  } catch (e) {
-    setDualHTML('admin-requests-body', 'modal-admin-requests-body', '<p class="empty-state">Could not load pending requests.</p>');
-  }
-}
-
-async function handlePendingRequestClick(e) {
-  const btn = e.target.closest('.approve-btn, .decline-btn');
-  if (!btn) return;
-  const row = btn.closest('.pending-row');
-  const action = btn.classList.contains('approve-btn') ? 'approve' : 'decline';
-  row.querySelectorAll('button').forEach(b => b.disabled = true);
-  btn.querySelector('.btn-label').textContent = '…';
-  try {
-    await api(`/api/overseerr/requests/${row.dataset.id}/${action}`, { method: 'POST' });
-    loadPendingRequests();
-  } catch (e) {
-    row.querySelectorAll('button').forEach(b => b.disabled = false);
-    btn.querySelector('.btn-label').textContent = action === 'approve' ? 'Approve' : 'Decline';
-  }
-}
-
-document.getElementById('admin-requests-body').addEventListener('click', handlePendingRequestClick);
-const modalRequestsBody = document.getElementById('modal-admin-requests-body');
-if (modalRequestsBody) modalRequestsBody.addEventListener('click', handlePendingRequestClick);
-
-async function loadAdminIssues() {
-  try {
-    const results = await api('/api/overseerr/issues/open');
-    if (!results.length) {
-      setDualHTML('admin-issues-body', 'modal-admin-issues-body', '<p class="empty-state">Nothing open.</p>');
-      return;
-    }
-    const html = results.map(r => {
-      const canSearch = (r.mediaType === 'movie' && store.services?.radarr) || (r.mediaType === 'tv' && store.services?.sonarr);
-      return `
-      <div class="pending-row" data-id="${r.id}" data-title="${escapeHtml(r.title || 'Unknown title')}"
-           data-media-type="${r.mediaType || ''}" data-tmdb-id="${r.tmdbId || ''}" data-tvdb-id="${r.tvdbId || ''}"
-           data-season="${r.season || ''}" data-episode="${r.episode || ''}">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
-        <div class="result-info">
-          <div class="result-title">${escapeHtml(r.title || 'Unknown title')}${r.season ? ` — S${r.season}E${r.episode}` : ''}</div>
-          <div class="pending-requester">
-            <img src="${r.reportedByAvatar || ''}" onerror="this.style.visibility='hidden'">
-            ${escapeHtml(r.reportedBy)} · ${r.issueType} · ${timeAgo(r.reportedAt)}
-          </div>
-          ${r.message ? `<div class="issue-message">${escapeHtml(r.message)}</div>` : ''}
-        </div>
-        <div class="pending-actions">
-          ${canSearch ? '<button class="search-release-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Search</span></button>' : ''}
-          <button class="approve-btn pill-btn"><span class="state-dot"></span><span class="btn-label">Resolve</span></button>
-        </div>
-      </div>
-    `;
-    }).join('');
-    setDualHTML('admin-issues-body', 'modal-admin-issues-body', html);
-  } catch (e) {
-    setDualHTML('admin-issues-body', 'modal-admin-issues-body', '<p class="empty-state">Could not load issues.</p>');
-  }
-}
-
-async function handleAdminIssuesClick(e) {
-  const searchBtn = e.target.closest('.search-release-btn');
-  if (searchBtn) {
-    openReleaseModal(searchBtn.closest('.pending-row').dataset);
-    return;
-  }
-  const btn = e.target.closest('.approve-btn');
-  if (!btn) return;
-  const row = btn.closest('.pending-row');
-  row.querySelectorAll('button').forEach(b => b.disabled = true);
-  btn.querySelector('.btn-label').textContent = '…';
-  try {
-    await api(`/api/overseerr/issues/${row.dataset.id}/resolve`, { method: 'POST' });
-    loadAdminIssues();
-  } catch (e) {
-    row.querySelectorAll('button').forEach(b => b.disabled = false);
-    btn.querySelector('.btn-label').textContent = 'Resolve';
-  }
-}
-
-document.getElementById('admin-issues-body').addEventListener('click', handleAdminIssuesClick);
-const modalIssuesBody = document.getElementById('modal-admin-issues-body');
-if (modalIssuesBody) modalIssuesBody.addEventListener('click', handleAdminIssuesClick);
-
-// ---------- Server Settings & Integration Health (owner only) ----------
-let currentEnvConfig = {};
-
-const SERVICE_CONFIG_SCHEMAS = {
-  Plex: {
-    title: 'Plex Server Configuration',
-    fields: [
-      { key: 'PLEX_SERVER_URL', label: 'Plex Server URL', placeholder: 'http://localhost:32400', hint: 'The internal or external URL to reach your Plex Media Server.' },
-      { key: 'PLEX_ADMIN_TOKEN', label: 'Plex Admin Token', placeholder: 'Your X-Plex-Token', hint: 'Owner authentication token for Plex.' },
-      { key: 'PLEX_MACHINE_ID', label: 'Plex Machine ID', placeholder: 'Plex machine identifier', hint: 'Found in Plex Settings > General, or via GET /identity.' },
-      { key: 'PLEX_CLIENT_ID', label: 'Plex Client ID', placeholder: 'marquee-app-a1b2c3d4', hint: 'Stable UUID identifying Marquee to plex.tv.' }
-    ]
-  },
-  Tautulli: {
-    title: 'Tautulli Configuration',
-    fields: [
-      { key: 'TAUTULLI_URL', label: 'Tautulli URL', placeholder: 'http://localhost:8181', hint: 'URL to reach Tautulli.' },
-      { key: 'TAUTULLI_API_KEY', label: 'Tautulli API Key', placeholder: 'API Key', hint: 'Tautulli > Settings > Web Interface > API Key.' },
-      { key: 'TAUTULLI_LIBRARIES', label: 'Custom Libraries (Comma-separated Label:SectionID)', placeholder: 'Movies:1, TV Shows:2, Documentaries:4, 4K Movies:5', hint: 'Custom Plex libraries to display. E.g. Movies:1, TV Shows:2, Documentaries:4.' },
-      { key: 'TAUTULLI_SECTION_MOVIES', label: 'Legacy Movies Section ID (Optional)', placeholder: '1', hint: 'Fallback section ID for movies.' },
-      { key: 'TAUTULLI_SECTION_TV', label: 'Legacy TV Shows Section ID (Optional)', placeholder: '2', hint: 'Fallback section ID for TV shows.' },
-      { key: 'TAUTULLI_SECTION_ANIME', label: 'Legacy Anime Section ID (Optional)', placeholder: '3', hint: 'Fallback section ID for anime.' }
-    ]
-  },
-  Overseerr: {
-    title: 'Overseerr / Jellyseerr Configuration',
-    fields: [
-      { key: 'OVERSEERR_URL', label: 'Overseerr URL', placeholder: 'http://localhost:5055', hint: 'URL to reach Overseerr.' },
-      { key: 'OVERSEERR_API_KEY', label: 'Overseerr API Key', placeholder: 'API Key', hint: 'Overseerr > Settings > General > API Key.' },
-      { key: 'OVERSEERR_WEBHOOK_SECRET', label: 'Webhook Authorization Secret', placeholder: 'Secret token', hint: 'Passed in Overseerr notification headers.' },
-      { key: 'OVERSEERR_WEBHOOK_FORWARD_URL', label: 'Webhook Forward URL (Optional)', placeholder: 'https://...', hint: 'Forwards Overseerr webhooks to an existing integration.' }
-    ]
-  },
-  Sonarr: {
-    title: 'Sonarr Configuration',
-    fields: [
-      { key: 'SONARR_URL', label: 'Sonarr URL', placeholder: 'http://localhost:8989', hint: 'URL to reach Sonarr.' },
-      { key: 'SONARR_API_KEY', label: 'Sonarr API Key', placeholder: 'API Key', hint: 'Sonarr > Settings > General > Security > API Key.' }
-    ]
-  },
-  Radarr: {
-    title: 'Radarr Configuration',
-    fields: [
-      { key: 'RADARR_URL', label: 'Radarr URL', placeholder: 'http://localhost:7878', hint: 'URL to reach Radarr.' },
-      { key: 'RADARR_API_KEY', label: 'Radarr API Key', placeholder: 'API Key', hint: 'Radarr > Settings > General > Security > API Key.' }
-    ]
-  },
-  qBittorrent: {
-    title: 'qBittorrent Configuration',
-    fields: [
-      { key: 'QBITTORRENT_URL', label: 'qBittorrent WebUI URL', placeholder: 'http://localhost:9080', hint: 'URL to reach qBittorrent WebUI.' },
-      { key: 'QBITTORRENT_API_KEY', label: 'API Key (Optional)', placeholder: 'API Key', hint: 'API Key for qBittorrent or reverse proxy auth. Skips username/password if set.' },
-      { key: 'QBITTORRENT_USERNAME', label: 'Username (Optional)', placeholder: 'admin', hint: 'WebUI username.' },
-      { key: 'QBITTORRENT_PASSWORD', label: 'Password (Optional)', placeholder: '••••••••', type: 'password', hint: 'WebUI password.' }
-    ]
-  },
-  SABnzbd: {
-    title: 'SABnzbd Configuration',
-    fields: [
-      { key: 'SABNZBD_URL', label: 'SABnzbd URL', placeholder: 'http://localhost:8080', hint: 'URL to reach SABnzbd.' },
-      { key: 'SABNZBD_API_KEY', label: 'SABnzbd API Key', placeholder: 'API Key', hint: 'SABnzbd > Settings > General > API Key.' }
-    ]
-  },
-  'Uptime Kuma': {
-    title: 'Uptime Kuma Configuration',
-    fields: [
-      { key: 'UPTIME_KUMA_DB_PATH', label: 'Database File Path', placeholder: '/app/uptime-kuma-data/kuma.db', hint: 'SQLite DB path inside container.' },
-      { key: 'UPTIME_KUMA_DATA_DIR', label: 'Host Data Directory', placeholder: '/path/to/kuma/data', hint: 'Mounted host path for Uptime Kuma.' }
-    ]
-  },
-  'NUT UPS': {
-    title: 'Network UPS Tools (NUT) Configuration',
-    fields: [
-      { key: 'NUT_HOST', label: 'NUT Host IP / Hostname', placeholder: '192.168.1.100', hint: 'Host running upsd server.' },
-      { key: 'NUT_PORT', label: 'NUT Port', placeholder: '3493', hint: 'Default NUT port is 3493.' },
-      { key: 'NUT_USERNAME', label: 'Username (Optional)', placeholder: 'monuser', hint: 'NUT authentication username.' },
-      { key: 'NUT_PASSWORD', label: 'Password (Optional)', placeholder: '••••••••', type: 'password', hint: 'NUT authentication password.' },
-      { key: 'NUT_UPS_NAME', label: 'UPS Device Name', placeholder: 'ups', hint: 'UPS device name configured in upsd.conf.' }
-    ]
-  },
-  ServerDeployment: {
-    title: 'Server & Branding Configuration',
-    fields: [
-      { key: 'SITE_NAME', label: 'Site Branding Name', placeholder: 'Marquee', hint: 'Shown as the page title, wordmark, and logo.' },
-      { key: 'SITE_TAGLINES', label: 'Sign-in Taglines', placeholder: 'Tagline 1|Tagline 2', hint: 'Pipe-separated list (|) of rotating taglines.' },
-      { key: 'PUBLIC_URL', label: 'Public Application URL', placeholder: 'https://media.example.com', hint: 'External domain or public URL.' },
-      { key: 'COOKIE_SECURE', label: 'HTTPS Cookie Security Mode', type: 'select', options: [{ val: 'false', label: 'HTTP (Development)' }, { val: 'true', label: 'HTTPS (Secure)' }], hint: 'Set to HTTPS (Secure) when running behind an SSL reverse proxy.' },
-      { key: 'HOST_PORT', label: 'Host Machine Port', placeholder: '4000', hint: 'External host port for reverse proxy mapping.' }
-    ]
-  }
-};
-
-async function loadServerSettings() {
-  const body = document.getElementById('server-config-body');
-  if (!body) return;
-  try {
-    const s = await api('/api/owner/settings');
-    if (s.env) currentEnvConfig = s.env;
-    const html = `
-      <table class="config-table">
-        <tbody>
-          <tr><td class="config-key">Site Name</td><td class="config-val">${escapeHtml(s.siteName)}</td></tr>
-          <tr><td class="config-key">Sign-in Taglines</td><td class="config-val">${escapeHtml(s.siteTaglines.join(' | '))}</td></tr>
-          <tr><td class="config-key">Host Port</td><td class="config-val">${escapeHtml(String(s.hostPort))}</td></tr>
-          <tr><td class="config-key">Public URL</td><td class="config-val">${s.publicUrl ? escapeHtml(s.publicUrl) : 'Not configured'}</td></tr>
-          <tr><td class="config-key">Cookie Security</td><td class="config-val"><span class="config-pill ${s.cookieSecure ? 'yes' : 'no'}">${s.cookieSecure ? 'HTTPS (Secure)' : 'HTTP (Development)'}</span></td></tr>
-          <tr><td class="config-key">Session DB Dir</td><td class="config-val">${escapeHtml(s.sessionDbDir)}</td></tr>
-          <tr><td class="config-key">Overseerr Webhook Secret</td><td class="config-val"><span class="config-pill ${s.webhookSecretSet ? 'yes' : 'no'}">${s.webhookSecretSet ? 'Configured' : 'Not configured'}</span></td></tr>
-          <tr><td class="config-key">Webhook Forwarding URL</td><td class="config-val">${s.webhookForwardUrl ? escapeHtml(s.webhookForwardUrl) : 'None'}</td></tr>
-        </tbody>
-      </table>
-    `;
-    body.innerHTML = html;
-  } catch (e) {
-    body.innerHTML = '<p class="empty-state">Could not load server configuration.</p>';
-  }
-}
-
-async function loadServiceHealth() {
-  const grid = document.getElementById('service-health-grid');
-  if (!grid) return;
-  grid.innerHTML = '<p class="empty-state">Testing service connections…</p>';
-  try {
-    const { results } = await api('/api/owner/health');
-    if (!results || !results.length) {
-      grid.innerHTML = '<p class="empty-state">No services checked.</p>';
-      return;
-    }
-    grid.innerHTML = results.map(r => {
-      const isOk = r.status === 'ok';
-      const isErr = r.status === 'error';
-      const badgeText = isOk ? 'Online' : (isErr ? 'Error' : 'Unconfigured');
-      const latencyText = r.latencyMs != null ? `⚡ ${r.latencyMs}ms` : '—';
-      let detailText = 'Not configured';
-      if (isOk) {
-        if (r.details?.version) detailText = `v${r.details.version}`;
-        else if (r.details?.monitorCount != null) detailText = `${r.details.monitorCount} monitors`;
-        else if (r.details?.batteryChargePercent != null) detailText = `UPS Battery ${r.details.batteryChargePercent}%`;
-        else detailText = 'Operational';
-      } else if (isErr) {
-        detailText = r.error || 'Connection failed';
-      }
-      return `
-        <div class="health-card clickable" data-service="${escapeHtml(r.name)}">
-          <div class="health-card-head">
-            <span class="health-card-title">${escapeHtml(r.name)}</span>
-            <span class="health-badge ${r.status}">${badgeText}</span>
-          </div>
-          <div class="health-card-latency">${latencyText}</div>
-          <div class="health-card-footer">
-            <span class="health-card-details">${escapeHtml(detailText)}</span>
-            <span class="card-edit-btn">Edit &#9998;</span>
-          </div>
-        </div>
-      `;
-    }).join('');
-  } catch (e) {
-    grid.innerHTML = '<p class="empty-state">Could not run health check.</p>';
-  }
-}
-
-const serviceHealthGrid = document.getElementById('service-health-grid');
-if (serviceHealthGrid) {
-  serviceHealthGrid.addEventListener('click', e => {
-    const card = e.target.closest('.health-card');
-    if (card && card.dataset.service) {
-      openEditSettingModal(card.dataset.service);
-    }
-  });
-}
-
-const editServerConfigBtn = document.getElementById('edit-server-config-btn');
-if (editServerConfigBtn) {
-  editServerConfigBtn.addEventListener('click', () => {
-    openEditSettingModal('ServerDeployment');
-  });
-}
-
-// Edit Setting Modal logic
-const editSettingModal = document.getElementById('edit-setting-modal');
-const editModalTitle = document.getElementById('edit-modal-title');
-const editModalFormBody = document.getElementById('edit-modal-form-body');
-const editModalStatus = document.getElementById('edit-modal-status');
-
-function openEditSettingModal(serviceKey) {
-  const schema = SERVICE_CONFIG_SCHEMAS[serviceKey];
-  if (!schema || !editSettingModal) return;
-
-  editModalTitle.textContent = schema.title;
-  if (editModalStatus) {
-    editModalStatus.textContent = '';
-    editModalStatus.className = 'report-status';
-  }
-
-  let html = '';
-  schema.fields.forEach(f => {
-    const val = currentEnvConfig[f.key] || '';
-    html += `<div class="setting-field">`;
-    html += `<label for="setting-input-${f.key}">${escapeHtml(f.label)}</label>`;
-    if (f.type === 'select') {
-      html += `<select id="setting-input-${f.key}" data-key="${f.key}">`;
-      (f.options || []).forEach(opt => {
-        const selected = (val === opt.val) ? 'selected' : '';
-        html += `<option value="${opt.val}" ${selected}>${escapeHtml(opt.label)}</option>`;
-      });
-      html += `</select>`;
-    } else {
-      const inputType = f.type || 'text';
-      html += `<input id="setting-input-${f.key}" type="${inputType}" data-key="${f.key}" value="${escapeHtml(val)}" placeholder="${escapeHtml(f.placeholder || '')}" autocomplete="off">`;
-    }
-    if (f.hint) {
-      html += `<div class="setting-hint">${escapeHtml(f.hint)}</div>`;
-    }
-    if (f.key === 'TAUTULLI_LIBRARIES') {
-      html += `<button type="button" class="btn btn-secondary btn-sm" id="detect-libraries-btn" style="margin-top: 6px; font-size: 0.8rem; padding: 4px 10px;">Auto-Detect Libraries from Tautulli</button>`;
-    }
-    html += `</div>`;
-  });
-
-  editModalFormBody.innerHTML = html;
-
-  const detectBtn = document.getElementById('detect-libraries-btn');
-  if (detectBtn) {
-    detectBtn.addEventListener('click', async () => {
-      detectBtn.disabled = true;
-      detectBtn.textContent = 'Detecting…';
-      try {
-        const libs = await api('/api/tautulli/libraries');
-        if (Array.isArray(libs) && libs.length > 0) {
-          const val = libs.map(l => `${l.name}:${l.sectionId}`).join(', ');
-          const input = document.getElementById('setting-input-TAUTULLI_LIBRARIES');
-          if (input) input.value = val;
-          if (editModalStatus) {
-            editModalStatus.textContent = `Detected ${libs.length} libraries! Click 'Save Changes' to apply.`;
-            editModalStatus.className = 'report-status ok';
-          }
-        } else {
-          if (editModalStatus) {
-            editModalStatus.textContent = 'No libraries returned by Tautulli.';
-            editModalStatus.className = 'report-status error';
-          }
-        }
-      } catch (e) {
-        if (editModalStatus) {
-          editModalStatus.textContent = 'Could not fetch libraries from Tautulli. Verify Tautulli URL & API Key.';
-          editModalStatus.className = 'report-status error';
-        }
-      } finally {
-        detectBtn.disabled = false;
-        detectBtn.textContent = 'Auto-Detect Libraries from Tautulli';
-      }
-    });
-  }
-
-  editSettingModal.classList.remove('hidden');
-}
-
-const closeEditSettingBtn = document.getElementById('close-edit-setting-btn');
-if (closeEditSettingBtn) {
-  closeEditSettingBtn.addEventListener('click', () => editSettingModal.classList.add('hidden'));
-}
-const cancelEditSettingBtn = document.getElementById('cancel-edit-setting-btn');
-if (cancelEditSettingBtn) {
-  cancelEditSettingBtn.addEventListener('click', () => editSettingModal.classList.add('hidden'));
-}
-
-const editSettingForm = document.getElementById('edit-setting-form');
-if (editSettingForm) {
-  editSettingForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    const saveBtn = document.getElementById('save-setting-btn');
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving…';
-    if (editModalStatus) editModalStatus.textContent = '';
-
-    const inputs = editModalFormBody.querySelectorAll('[data-key]');
-    const updates = {};
-    inputs.forEach(input => {
-      updates[input.dataset.key] = input.value;
-    });
-
-    try {
-      await api('/api/owner/settings', {
-        method: 'POST',
-        body: JSON.stringify(updates)
-      });
-
-      for (const [k, v] of Object.entries(updates)) {
-        currentEnvConfig[k] = v;
-      }
-
-      if (editModalStatus) {
-        editModalStatus.textContent = 'Settings saved successfully!';
-        editModalStatus.className = 'report-status ok';
-      }
-
-      setTimeout(async () => {
-        editSettingModal.classList.add('hidden');
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save Changes';
-        loadServerSettings();
-        loadServiceHealth();
-        const me = await api('/api/auth/me').catch(() => null);
-        if (me && me.services) {
-          store.services = me.services;
-          applyServiceVisibility(me.services);
-        }
-        if (store.services?.tautulli) {
-          loadRecentlyAdded();
-          loadTopOfMonth();
-        }
-      }, 600);
-    } catch (err) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save Changes';
-      if (editModalStatus) {
-        editModalStatus.textContent = err.message || 'Failed to save settings.';
-        editModalStatus.className = 'report-status error';
-      }
-    }
-  });
-}
-
-// ---------- Admin & Settings Modal ----------
-const adminSettingsModal = document.getElementById('admin-settings-modal');
-
-function openAdminSettingsModal() {
-  if (!adminSettingsModal) return;
-  adminSettingsModal.classList.remove('hidden');
-  loadOwnerStatus();
-  loadAdminLogins();
-  loadPendingRequests();
-  loadAdminIssues();
-  loadServerSettings();
-  loadServiceHealth();
-}
-
-const adminSettingsBtn = document.getElementById('admin-settings-btn');
-if (adminSettingsBtn) adminSettingsBtn.addEventListener('click', openAdminSettingsModal);
-
-document.querySelectorAll('.open-admin-settings-btn').forEach(btn => {
-  btn.addEventListener('click', openAdminSettingsModal);
-});
-
-const closeAdminSettingsBtn = document.getElementById('close-admin-settings-btn');
-if (closeAdminSettingsBtn) {
-  closeAdminSettingsBtn.addEventListener('click', () => {
-    adminSettingsModal.classList.add('hidden');
-  });
-}
-
-// Admin Modal Tabs
-const tabAdminOverviewBtn = document.getElementById('tab-admin-overview-btn');
-const tabAdminStatusBtn = document.getElementById('tab-admin-status-btn');
-const tabAdminHealthBtn = document.getElementById('tab-admin-health-btn');
-
-const adminTabOverview = document.getElementById('admin-tab-overview');
-const adminTabStatus = document.getElementById('admin-tab-status');
-const adminTabHealth = document.getElementById('admin-tab-health');
-
-if (tabAdminOverviewBtn) {
-  tabAdminOverviewBtn.addEventListener('click', () => {
-    tabAdminOverviewBtn.classList.add('active');
-    tabAdminStatusBtn.classList.remove('active');
-    tabAdminHealthBtn.classList.remove('active');
-    adminTabOverview.classList.remove('hidden');
-    adminTabStatus.classList.add('hidden');
-    adminTabHealth.classList.add('hidden');
-  });
-}
-
-if (tabAdminStatusBtn) {
-  tabAdminStatusBtn.addEventListener('click', () => {
-    tabAdminOverviewBtn.classList.remove('active');
-    tabAdminStatusBtn.classList.add('active');
-    tabAdminHealthBtn.classList.remove('active');
-    adminTabOverview.classList.add('hidden');
-    adminTabStatus.classList.remove('hidden');
-    adminTabHealth.classList.add('hidden');
-  });
-}
-
-if (tabAdminHealthBtn) {
-  tabAdminHealthBtn.addEventListener('click', () => {
-    tabAdminOverviewBtn.classList.remove('active');
-    tabAdminStatusBtn.classList.remove('active');
-    tabAdminHealthBtn.classList.add('active');
-    adminTabOverview.classList.add('hidden');
-    adminTabStatus.classList.add('hidden');
-    adminTabHealth.classList.remove('hidden');
-  });
-}
-
-const refreshHealthBtn = document.getElementById('refresh-health-btn');
-if (refreshHealthBtn) refreshHealthBtn.addEventListener('click', loadServiceHealth);
-
-// ---------- Release search modal (owner only) ----------
-// Interactive search against Radarr/Sonarr's own configured indexers, so a
-// bad/wrong release reported as an issue can be fixed without leaving the
-// dashboard. Can take up to ~a minute — this is a live indexer search, not a
-// cached lookup, same as Sonarr/Radarr's own "Interactive Search" UI.
-function formatBytes(bytes) {
-  if (!bytes) return '';
-  return (bytes / (1024 ** 3)).toFixed(1) + ' GB';
-}
-
-async function openReleaseModal(ctx) {
-  const modal = document.getElementById('release-modal');
-  const listEl = document.getElementById('release-list');
-  document.getElementById('release-modal-title').textContent = ctx.title +
-    (ctx.season ? ` — S${ctx.season}E${ctx.episode}` : '');
-  listEl.innerHTML = '<p class="empty-state">Searching indexers… this can take up to a minute.</p>';
-  modal.classList.remove('hidden');
-
-  const isMovie = ctx.mediaType === 'movie';
-  const url = isMovie
-    ? `/api/radarr/releases?tmdbId=${ctx.tmdbId}`
-    : `/api/sonarr/releases?tvdbId=${ctx.tvdbId}&season=${ctx.season}&episode=${ctx.episode}`;
-  const grabUrl = isMovie ? '/api/radarr/releases/grab' : '/api/sonarr/releases/grab';
-
-  try {
-    const releases = await api(url);
-    if (!releases.length) { listEl.innerHTML = '<p class="empty-state">No releases found.</p>'; return; }
-    listEl.innerHTML = releases.map(r => `
-      <div class="release-row ${r.rejected ? 'rejected' : ''}">
-        <div class="release-info">
-          <div class="release-title" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</div>
-          <div class="release-meta">
-            ${escapeHtml(r.quality || 'Unknown')} · ${formatBytes(r.sizeBytes)} · ${escapeHtml(r.indexer)}
-            · ${r.protocol === 'torrent' ? `${r.seeders ?? 0} seeders` : `${r.ageDays ?? '?'}d old`}
-          </div>
-          ${r.rejected ? `<div class="release-rejections">${escapeHtml(r.rejections.join(', '))}</div>` : ''}
-        </div>
-        <button class="grab-btn pill-btn" data-guid="${escapeHtml(r.guid)}" data-indexer-id="${r.indexerId}">
-          <span class="state-dot"></span><span class="btn-label">Grab</span>
-        </button>
-      </div>
-    `).join('');
-  } catch (e) {
-    listEl.innerHTML = `<p class="empty-state">${escapeHtml(e.message || 'Search failed.')}</p>`;
-  }
-
-  listEl.onclick = async e => {
-    const btn = e.target.closest('.grab-btn');
-    if (!btn) return;
-    btn.disabled = true;
-    btn.querySelector('.btn-label').textContent = 'Grabbing…';
-    try {
-      await api(grabUrl, {
-        method: 'POST',
-        body: JSON.stringify({ guid: btn.dataset.guid, indexerId: Number(btn.dataset.indexerId) })
-      });
-      btn.querySelector('.btn-label').textContent = 'Grabbed ✓';
-    } catch (err) {
-      btn.disabled = false;
-      btn.querySelector('.btn-label').textContent = 'Grab';
-    }
-  };
-}
-
-document.getElementById('close-release-modal-btn').addEventListener('click', () => {
-  document.getElementById('release-modal').classList.add('hidden');
-});
-
-function formatUpsStatus(status) {
-  const flags = {
-    OL: 'Online', OB: 'On Battery', LB: 'Low Battery', CHRG: 'Charging', DISCHRG: 'Discharging',
-    RB: 'Replace Battery', BYPASS: 'Bypass', CAL: 'Calibrating', OFF: 'Offline', OVER: 'Overloaded',
-    TRIM: 'Trimming', BOOST: 'Boosting', FSD: 'Forced Shutdown'
-  };
-  return status.split(' ').map(f => flags[f] || f).join(' · ');
 }
 
 // ---------- Request modal ----------
@@ -1239,30 +638,43 @@ document.getElementById('close-modal-btn').addEventListener('click', () => {
 });
 
 // ---------- Request modal tabs ----------
-const tabSearchBtn = document.getElementById('tab-search-btn');
-const tabMyRequestsBtn = document.getElementById('tab-myrequests-btn');
-const searchTab = document.getElementById('search-tab');
-const myRequestsTab = document.getElementById('myrequests-tab');
+// Each tab is a { btn, pane } pair; activateTab flips every pane/button at once
+// so adding a new tab is just one more entry here rather than more pairwise
+// on/off toggling.
+const modalTabs = [
+  { btn: document.getElementById('tab-search-btn'), pane: document.getElementById('search-tab') },
+  { btn: document.getElementById('tab-myrequests-btn'), pane: document.getElementById('myrequests-tab') },
+  { btn: document.getElementById('tab-watchlist-btn'), pane: document.getElementById('watchlist-tab') }
+];
+function activateTab(btn) {
+  for (const t of modalTabs) {
+    const isActive = t.btn === btn;
+    t.btn.classList.toggle('active', isActive);
+    t.pane.classList.toggle('hidden', !isActive);
+  }
+}
+
 let myRequestsLoaded = false;
+let watchlistLoaded = false;
 
-tabSearchBtn.addEventListener('click', () => {
-  tabSearchBtn.classList.add('active');
-  tabMyRequestsBtn.classList.remove('active');
-  searchTab.classList.remove('hidden');
-  myRequestsTab.classList.add('hidden');
-});
+modalTabs[0].btn.addEventListener('click', () => activateTab(modalTabs[0].btn));
 
-tabMyRequestsBtn.addEventListener('click', () => {
-  tabMyRequestsBtn.classList.add('active');
-  tabSearchBtn.classList.remove('active');
-  myRequestsTab.classList.remove('hidden');
-  searchTab.classList.add('hidden');
+modalTabs[1].btn.addEventListener('click', () => {
+  activateTab(modalTabs[1].btn);
   // Lazy-loaded on first visit to the tab, then left cached for the rest of
   // this modal session — requests don't change status fast enough to need
   // refetching every time the tab is reopened within the same visit.
   if (!myRequestsLoaded) {
     myRequestsLoaded = true;
     loadMyRequests();
+  }
+});
+
+modalTabs[2].btn.addEventListener('click', () => {
+  activateTab(modalTabs[2].btn);
+  if (!watchlistLoaded) {
+    watchlistLoaded = true;
+    loadWatchlist();
   }
 });
 
@@ -1274,14 +686,14 @@ async function loadMyRequests() {
       listEl.innerHTML = '<p class="empty-state">No requests yet.</p>';
       return;
     }
-    const statusText = { available: 'Available', downloading: 'Downloading', pending: 'Pending Approval', declined: 'Declined' };
+    const statusText = { available: 'Available', downloading: 'Downloading', approved: 'Approved', pending: 'Pending Approval', declined: 'Declined' };
     listEl.innerHTML = results.map(r => `
       <div class="my-request-row">
-        <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+        <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div class="result-title">${escapeHtml(r.title || 'Unknown title')}</div>
           <div class="my-request-status ${r.availability}">
-            <span class="status-dot"></span>${statusText[r.availability] || r.availability}
+            <span class="status-dot"></span>${statusText[r.availability] || r.availability}${r.availability === 'downloading' && r.etaSeconds != null ? ' · ' + formatEta(r.etaSeconds) : ''}
           </div>
         </div>
       </div>
@@ -1291,18 +703,19 @@ async function loadMyRequests() {
   }
 }
 
-// Shared by the discover feed and actual search results — same item shape
-// from the backend (routes/overseerr.js's mapDiscoverItem), same row markup.
-// Keeps the last-rendered array around so a row click can look itself up by
-// index and open the info modal with full details before requesting.
-let currentSearchResults = [];
-function renderSearchResults(results, emptyMessage) {
-  currentSearchResults = results;
-  const resultsEl = document.getElementById('search-results');
+// Shared by the discover feed, actual search results, and the watchlist tab —
+// same item shape from the backend (lib/overseerrClient.js's mapDiscoverItem),
+// same row markup. Keeps the last-rendered array around per container so a row
+// click can look itself up by index and open the info modal with full details
+// before requesting.
+const resultsStore = {};
+function renderSearchResults(results, emptyMessage, containerId = 'search-results') {
+  resultsStore[containerId] = results;
+  const resultsEl = document.getElementById(containerId);
   if (!results.length) { resultsEl.innerHTML = `<p class="empty-state">${emptyMessage}</p>`; return; }
   resultsEl.innerHTML = results.map((r, idx) => `
     <div class="result-item" data-idx="${idx}">
-      <img class="result-poster" src="${r.poster || ''}" onerror="this.style.visibility='hidden'">
+      <img class="result-poster" src="${r.poster || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
       <div class="result-info">
         <div class="result-title">${escapeHtml(r.title)}</div>
         <div class="result-year">${r.year || ''} · ${r.mediaType === 'tv' ? 'Series' : 'Movie'}</div>
@@ -1332,6 +745,20 @@ async function loadDiscover() {
   }
 }
 
+// The family member's own Plex Watchlist, cross-referenced against Overseerr
+// server-side (routes/watchlist.js) so it renders with the exact same row
+// markup + request flow as search/discover.
+async function loadWatchlist() {
+  const listEl = document.getElementById('watchlist-list');
+  listEl.innerHTML = '<p class="empty-state">Loading…</p>';
+  try {
+    const results = await api('/api/watchlist');
+    renderSearchResults(results, "Nothing on your Plex Watchlist yet.", 'watchlist-list');
+  } catch (e) {
+    listEl.innerHTML = '<p class="empty-state">Could not load your watchlist.</p>';
+  }
+}
+
 let searchTimer;
 document.getElementById('search-input').addEventListener('input', e => {
   clearTimeout(searchTimer);
@@ -1348,7 +775,10 @@ document.getElementById('search-input').addEventListener('input', e => {
   }, 400);
 });
 
-document.getElementById('search-results').addEventListener('click', async e => {
+// Shared by the search-results and watchlist-list containers — same row
+// markup, same request flow, just a different source list and (for the
+// season picker) a different tab to return to when it closes.
+async function handleResultsClick(e, containerId, tabId) {
   const btn = e.target.closest('.request-btn');
   if (btn && !btn.disabled) {
     const id = Number(btn.dataset.id);
@@ -1357,7 +787,7 @@ document.getElementById('search-results').addEventListener('click', async e => {
     // TV shows go through the season picker instead of requesting the whole
     // series outright — movies have no seasons, so those still request directly.
     if (mediaType === 'tv') {
-      openSeasonPicker(id, btn.dataset.title, btn);
+      openSeasonPicker(id, btn.dataset.title, btn, tabId);
       return;
     }
     btn.disabled = true;
@@ -1379,7 +809,7 @@ document.getElementById('search-results').addEventListener('click', async e => {
   // button) — show details before committing to a request.
   const item = e.target.closest('.result-item');
   if (!item) return;
-  const r = currentSearchResults[Number(item.dataset.idx)];
+  const r = resultsStore[containerId]?.[Number(item.dataset.idx)];
   if (!r) return;
   openInfo({
     poster: r.poster, title: r.title,
@@ -1388,22 +818,25 @@ document.getElementById('search-results').addEventListener('click', async e => {
     overview: r.overview,
     request: r
   });
-});
+}
+document.getElementById('search-results').addEventListener('click', e => handleResultsClick(e, 'search-results', 'search-tab'));
+document.getElementById('watchlist-list').addEventListener('click', e => handleResultsClick(e, 'watchlist-list', 'watchlist-tab'));
 
 // ---------- Season picker ----------
-let seasonPickerContext = null; // { id, button }
+// Shown in place of whichever tab (Search or Watchlist) triggered it — returnTabId
+// remembers which one to bring back when the picker closes.
+let seasonPickerContext = null; // { id, button, returnTabId }
 
-async function openSeasonPicker(id, title, button) {
+async function openSeasonPicker(id, title, button, returnTabId) {
   const listEl = document.getElementById('season-picker-list');
   const submitBtn = document.getElementById('season-picker-submit');
 
-  seasonPickerContext = { id, button };
+  seasonPickerContext = { id, button, returnTabId };
   document.getElementById('season-picker-title').textContent = title;
   listEl.innerHTML = '<p class="empty-state">Loading seasons…</p>';
   submitBtn.disabled = false;
   submitBtn.textContent = 'Request Selected Seasons';
-  document.getElementById('search-results').classList.add('hidden');
-  document.getElementById('search-input').classList.add('hidden');
+  document.getElementById(returnTabId).classList.add('hidden');
   document.getElementById('season-picker').classList.remove('hidden');
 
   try {
@@ -1434,8 +867,9 @@ async function openSeasonPicker(id, title, button) {
 
 function closeSeasonPicker() {
   document.getElementById('season-picker').classList.add('hidden');
-  document.getElementById('search-results').classList.remove('hidden');
-  document.getElementById('search-input').classList.remove('hidden');
+  if (seasonPickerContext) {
+    document.getElementById(seasonPickerContext.returnTabId).classList.remove('hidden');
+  }
   seasonPickerContext = null;
 }
 
@@ -1629,7 +1063,7 @@ document.getElementById('report-search-input').addEventListener('input', e => {
       const results = await api(`/api/plex/search?q=${encodeURIComponent(q)}`);
       resultsEl.innerHTML = results.map(r => `
         <div class="result-item" data-ratingkey="${r.ratingKey}" data-title="${escapeHtml(r.title)}" data-type="${r.type}" data-thumb="${r.thumb || ''}" data-year="${r.year || ''}">
-          <img class="result-poster" src="${r.thumb || ''}" onerror="this.style.visibility='hidden'">
+          <img class="result-poster" src="${r.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
           <div class="result-info">
             <div class="result-title">${escapeHtml(r.title)}</div>
             <div class="result-year">${r.year || ''} · ${r.type === 'show' ? 'Series' : 'Movie'}</div>
@@ -1665,7 +1099,7 @@ async function loadReportBrowse(ratingKey, title) {
     const items = await api(`/api/plex/children/${ratingKey}`);
     listEl.innerHTML = items.map(i => `
       <div class="browse-row" data-ratingkey="${i.ratingKey}" data-title="${escapeHtml(i.title)}" data-type="${i.type}" data-thumb="${i.thumb || ''}">
-        <img class="browse-row-thumb" src="${i.thumb || ''}" onerror="this.style.visibility='hidden'">
+        <img class="browse-row-thumb" src="${i.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="browse-row-name">${i.type === 'episode' ? `${i.index}. ${escapeHtml(i.title)}` : escapeHtml(i.title)}</div>
       </div>
     `).join('');
@@ -1777,9 +1211,6 @@ function renderStreamInfo(stream) {
   `).join('');
 }
 
-function titleCase(str) {
-  return str.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
-}
 document.getElementById('close-info-btn').addEventListener('click', () => infoModal.classList.add('hidden'));
 infoModal.addEventListener('click', e => { if (e.target === infoModal) infoModal.classList.add('hidden'); });
 
@@ -1865,23 +1296,3 @@ document.getElementById('upcoming-body').addEventListener('click', e => {
   });
 });
 
-// ---------- Helpers ----------
-function dotClass(bad) {
-  return 'state-dot' + (bad ? ' paused' : '');
-}
-function escapeHtml(str = '') {
-  return str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-function timeAgo(ts) {
-  // Accepts either an epoch-ms number (Tautulli/login log) or an ISO date string
-  // (Overseerr's createdAt) — normalize through Date so both work.
-  const mins = Math.round((Date.now() - new Date(ts).getTime()) / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
-function formatDate(iso) {
-  if (!iso) return 'TBA';
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}

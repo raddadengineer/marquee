@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{SITE_NAME}}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fonts.css?v={{ASSET_VERSION}}">
 <link rel="stylesheet" href="style.css?v={{ASSET_VERSION}}">
 
 <link rel="manifest" href="manifest.webmanifest">
@@ -19,6 +18,8 @@
 <meta name="apple-mobile-web-app-title" content="{{SITE_NAME}}">
 
 <script>window.SITE_TAGLINES = {{TAGLINES_JSON}};</script>
+<!-- Base64url charset only (A-Za-z0-9-_) — safe to inline directly, same as SITE_NAME. -->
+<script>window.VAPID_PUBLIC_KEY = "{{VAPID_PUBLIC_KEY}}";</script>
 </head>
 <body>
 
@@ -40,10 +41,9 @@
 
     <!-- HERO MASTHEAD -->
     <div class="hero">
-      <div class="hero-bg" id="hero-bg">
-        <div class="hero-bg-slide slide-a active"></div>
+      <div id="hero-bg" class="hero-bg">
+        <div class="hero-bg-slide slide-a"></div>
         <div class="hero-bg-slide slide-b"></div>
-        <div class="hero-bg-overlay"></div>
       </div>
       <div class="hero-top">
         <div>
@@ -54,6 +54,18 @@
           <button id="admin-settings-btn" class="icon-btn hidden" aria-label="Admin & Settings" title="Admin & Settings">&#9881;</button>
           <button id="search-btn" class="icon-btn" aria-label="Request something">+</button>
           <button id="report-search-btn" class="icon-btn" aria-label="Report an issue">&#9873;</button>
+          <button id="notify-toggle-btn" class="icon-btn hidden" aria-label="Enable notifications">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+          </button>
+          <a id="admin-link-btn" href="/admin" class="icon-btn hidden" aria-label="Admin">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </a>
           <div class="avatar-chip">
             <div class="avatar"></div>
             <div><div class="avatar-name" id="whoami"></div><div class="avatar-role">Signed in</div></div>
@@ -65,6 +77,7 @@
         <div>
           <div class="hero-headline" id="hero-headline">Loading…</div>
           <div class="hero-sub" id="live-indicator">CH.01 &middot; ON AIR</div>
+          <div id="hero-featured-tag" class="hero-featured-tag hidden"></div>
         </div>
         <div class="hero-mid-right">
           <div class="date-pill">
@@ -74,6 +87,12 @@
           <div id="hero-featured-tag" class="hero-featured-tag hidden"></div>
         </div>
       </div>
+    </div>
+
+    <!-- NOTICE BOARD (owner-scheduled announcement, e.g. planned maintenance) -->
+    <div id="notice-banner" class="notice-banner hidden">
+      <span class="notice-banner-icon">&#9888;</span>
+      <span id="notice-banner-text"></span>
     </div>
 
     <!-- BENTO GRID -->
@@ -114,28 +133,8 @@
         <div id="downloads-body"><p class="empty-state">Loading…</p></div>
       </section>
 
-      <section class="card span4 hidden" id="panel-owner">
-        <div class="card-header-flex">
-          <div class="card-label"><span class="chan">CH.08</span> System Status</div>
-          <button class="pill-btn open-admin-settings-btn"><span class="state-dot"></span>Settings &#9881;</button>
-        </div>
-        <div id="owner-body"><p class="empty-state">Loading…</p></div>
-      </section>
-
-      <section class="card span4 hidden" id="panel-admin">
-        <div class="card-header-flex">
-          <div class="card-label"><span class="chan">CH.09</span> Admin</div>
-          <button class="pill-btn open-admin-settings-btn"><span class="state-dot"></span>Full Admin View &#9881;</button>
-        </div>
-        <h4 class="admin-subhead">Recent sign-ins</h4>
-        <div id="admin-logins-body"><p class="empty-state">Loading…</p></div>
-        <h4 class="admin-subhead">Pending requests</h4>
-        <div id="admin-requests-body"><p class="empty-state">Loading…</p></div>
-        <h4 class="admin-subhead">Open issues</h4>
-        <div id="admin-issues-body"><p class="empty-state">Loading…</p></div>
-      </section>
-
     </div>
+    <div class="app-footer">{{SITE_NAME}} v{{APP_VERSION}} &middot; &copy; {{COPYRIGHT_YEAR}}</div>
   </div>
 
   <button id="fab-request-btn" class="fab" aria-label="Request something">
@@ -165,23 +164,29 @@
     <div class="modal-tabs">
       <button id="tab-search-btn" class="modal-tab pill-btn active"><span class="state-dot"></span>Search</button>
       <button id="tab-myrequests-btn" class="modal-tab pill-btn"><span class="state-dot"></span>My Requests</button>
+      <button id="tab-watchlist-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Watchlist</button>
     </div>
 
     <div id="search-tab">
       <input id="search-input" type="text" placeholder="Search a movie or show…" autocomplete="off">
       <div id="discover-label" class="discover-label">Trending &amp; new releases — not yet in your library</div>
       <div id="search-results" class="search-results"></div>
-
-      <div id="season-picker" class="season-picker hidden">
-        <button id="season-picker-back" class="pill-btn"><span class="state-dot paused"></span>&#8592; Back to search</button>
-        <h4 id="season-picker-title"></h4>
-        <div id="season-picker-list" class="season-list"></div>
-        <button id="season-picker-submit" class="btn-primary">Request Selected Seasons</button>
-      </div>
     </div>
 
     <div id="myrequests-tab" class="hidden">
       <div id="my-requests-list" class="my-requests-list"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="watchlist-tab" class="hidden">
+      <div id="watchlist-label" class="discover-label">Your Plex Watchlist — tap Request to grab anything you don't have yet</div>
+      <div id="watchlist-list" class="search-results"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="season-picker" class="season-picker hidden">
+      <button id="season-picker-back" class="pill-btn"><span class="state-dot paused"></span>&#8592; Back</button>
+      <h4 id="season-picker-title"></h4>
+      <div id="season-picker-list" class="season-list"></div>
+      <button id="season-picker-submit" class="btn-primary">Request Selected Seasons</button>
     </div>
   </div>
 </div>
@@ -208,7 +213,7 @@
     <div id="report-form-view" class="hidden">
       <button id="report-form-back" class="pill-btn"><span class="state-dot paused"></span>&#8592; Back</button>
       <div class="result-item">
-        <img id="report-form-poster" class="result-poster" src="" onerror="this.style.visibility='hidden'">
+        <img id="report-form-poster" class="result-poster" src="" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="result-info">
           <div id="report-form-title" class="result-title"></div>
           <div id="report-form-subtitle" class="result-year"></div>
@@ -227,24 +232,12 @@
   </div>
 </div>
 
-<!-- RELEASE SEARCH MODAL (owner only — search Radarr/Sonarr's indexers directly
-     from an open issue, to fix a bad file without leaving the dashboard) -->
-<div id="release-modal" class="modal hidden">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3 id="release-modal-title">Search for a release</h3>
-      <button id="close-release-modal-btn" class="pill-btn pill-btn-icon">&#10005;</button>
-    </div>
-    <div id="release-list" class="release-list"><p class="empty-state">Loading…</p></div>
-  </div>
-</div>
-
 <!-- MEDIA INFO MODAL -->
 <div id="info-modal" class="modal hidden">
   <div class="modal-card info-card">
     <button id="close-info-btn" class="pill-btn pill-btn-icon info-close">&#10005;</button>
     <div class="info-layout">
-      <img id="info-poster" class="info-poster" src="" onerror="this.style.visibility='hidden'">
+      <img id="info-poster" class="info-poster" src="" loading="lazy" onerror="this.style.visibility='hidden'">
       <div class="info-body">
         <span id="info-badge" class="chan"></span>
         <h3 id="info-title"></h3>
@@ -277,75 +270,31 @@
   </div>
 </div>
 
-<!-- ADMIN & SETTINGS MODAL (Owner only) -->
-<div id="admin-settings-modal" class="modal hidden">
-  <div class="modal-card modal-card-wide">
-    <div class="modal-head">
-      <h3>Owner Admin &amp; Settings</h3>
-      <button id="close-admin-settings-btn" class="pill-btn pill-btn-icon">&#10005;</button>
+<div id="torrent-modal" class="modal hidden">
+  <div class="modal-card info-card torrent-details-card">
+    <button id="close-torrent-btn" class="pill-btn pill-btn-icon info-close">&#10005;</button>
+    <div class="torrent-details-layout">
+      <h3 id="torrent-details-title"></h3>
+      <dl id="torrent-details-stats" class="info-stream"></dl>
+      <div id="torrent-details-files" class="torrent-files"></div>
     </div>
-
-    <div class="modal-tabs">
-      <button id="tab-admin-overview-btn" class="modal-tab pill-btn active"><span class="state-dot"></span>Overview &amp; Requests</button>
-      <button id="tab-admin-status-btn" class="modal-tab pill-btn"><span class="state-dot"></span>System Status</button>
-      <button id="tab-admin-health-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Services &amp; Settings</button>
-    </div>
-
-    <!-- TAB 1: OVERVIEW & REQUESTS -->
-    <div id="admin-tab-overview">
-      <h4 class="admin-subhead">Recent sign-ins</h4>
-      <div id="modal-admin-logins-body"><p class="empty-state">Loading…</p></div>
-
-      <h4 class="admin-subhead">Pending Overseerr requests</h4>
-      <div id="modal-admin-requests-body"><p class="empty-state">Loading…</p></div>
-
-      <h4 class="admin-subhead">Open issues</h4>
-      <div id="modal-admin-issues-body"><p class="empty-state">Loading…</p></div>
-    </div>
-
-    <!-- TAB 2: SYSTEM STATUS -->
-    <div id="admin-tab-status" class="hidden">
-      <div id="modal-owner-body"><p class="empty-state">Loading…</p></div>
-    </div>
-
-    <!-- TAB 3: SERVICES & SETTINGS -->
-    <div id="admin-tab-health" class="hidden">
-      <div class="settings-section-head">
-        <h4>Integrated Service Health &amp; Latency</h4>
-        <button id="refresh-health-btn" class="pill-btn"><span class="state-dot"></span>Run Health Check</button>
-      </div>
-      <div id="service-health-grid" class="health-grid"><p class="empty-state">Loading service health…</p></div>
-
-      <div class="settings-section-head" style="margin-top:24px;">
-        <h4>Server &amp; Deployment Configuration</h4>
-        <button id="edit-server-config-btn" class="pill-btn"><span class="state-dot"></span>Edit Deployment Settings &#9998;</button>
-      </div>
-      <div id="server-config-body"><p class="empty-state">Loading settings…</p></div>
-    </div>
-
-  </div>
-</div>
-
-<!-- EDIT SETTING MODAL -->
-<div id="edit-setting-modal" class="modal hidden">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3 id="edit-modal-title">Edit Configuration</h3>
-      <button id="close-edit-setting-btn" class="pill-btn pill-btn-icon">&#10005;</button>
-    </div>
-    <form id="edit-setting-form">
-      <div id="edit-modal-form-body"></div>
-      <p id="edit-modal-status" class="report-status"></p>
-      <div class="modal-foot" style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
-        <button type="button" id="cancel-edit-setting-btn" class="pill-btn">Cancel</button>
-        <button type="submit" id="save-setting-btn" class="btn-primary">Save Changes</button>
-      </div>
-    </form>
   </div>
 </div>
 
 <div id="toast-container"></div>
 
+<!-- CONFIRM DIALOG (replaces the browser's native confirm() — see shared.js's confirmDialog) -->
+<div id="confirm-modal" class="modal hidden">
+  <div class="modal-card confirm-card">
+    <p id="confirm-message"></p>
+    <div class="settings-edit-actions">
+      <button id="confirm-cancel-btn" class="pill-btn">Cancel</button>
+      <button id="confirm-ok-btn" class="btn-primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js?v={{ASSET_VERSION}}"></script>
 <script src="app.js?v={{ASSET_VERSION}}"></script>
 </body>
 </html>
