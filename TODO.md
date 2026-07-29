@@ -4,7 +4,7 @@ Every shipped feature or fix gets its own version bump now (`package.json`
 + `package-lock.json`) and its own section here — no more letting the
 version drift unversioned between batches. One bump per shipped unit of
 work: a new capability bumps minor, a fix bumps patch. **Current version:
-v1.4.2.**
+v1.4.3.**
 
 `v1.1.0` through `v1.4.1` below are a one-time retroactive reconstruction —
 package.json had said `1.1.0` since the batch that first added a version
@@ -26,6 +26,8 @@ gets versioned as it ships, not reconstructed later.
 - **v1.4.1** — fix batch: admin poster flicker, grab-status timing, Notice
   Board clipped text, avatar chip label
 - **v1.4.2** — fix: notification bell failed silently
+- **v1.4.3** — fix: bell's real root cause on Safari (implicit permission
+  prompt unreliable there)
 
 ---
 
@@ -528,5 +530,25 @@ gets versioned as it ships, not reconstructed later.
       blocked at the browser level for this site) — the fix makes any of
       those visible instead of silent, rather than claiming to have
       reproduced the exact failure.
+
+## v1.4.3 — Fix: bell's real root cause on Safari
+
+- [x] **Fix**: v1.4.2's error surfacing paid off immediately — confirmed
+      live (Safari on Mac) that the alert showed "unknown error" with no
+      permission prompt ever appearing at all, before or after. Ruled out
+      the VAPID key itself (decoded and checked by hand: a valid 65-byte
+      uncompressed P-256 point) and the server (no corresponding error in
+      the logs — this was failing entirely client-side, before ever
+      reaching `/api/push/subscribe`). The code was relying on
+      `pushManager.subscribe()` to implicitly trigger the browser's
+      notification permission prompt, same as Chrome does — Safari doesn't
+      reliably do that; it can reject outright with no prompt shown at all.
+      Now calls `Notification.requestPermission()` explicitly first
+      (the standard cross-browser-safe pattern) before ever calling
+      `subscribe()`. Also improved the error alert to show `name: message`
+      when both are present instead of just `message` alone, in case
+      there's still more to learn from whatever Safari throws next. Deployed
+      live; confirmation that this actually resolves it on Safari is
+      pending a retry.
 
 ## Ideas

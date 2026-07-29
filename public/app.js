@@ -136,6 +136,19 @@ async function initNotifyToggle() {
         alert('Notifications are blocked for this site — check your browser\'s site settings (usually the padlock/site info icon next to the address bar) to allow them, then try again.');
         return;
       }
+      // Relying on subscribe() to implicitly trigger the permission prompt
+      // works on Chrome but isn't reliable on Safari — it can reject
+      // straight away with no prompt ever shown. Requesting permission
+      // explicitly first is the standard cross-browser-safe pattern.
+      if (Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          alert(permission === 'denied'
+            ? 'Notifications weren\'t enabled — permission was denied.'
+            : 'Notifications weren\'t enabled — no response to the permission prompt.');
+          return;
+        }
+      }
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(window.VAPID_PUBLIC_KEY)
@@ -144,7 +157,8 @@ async function initNotifyToggle() {
       btn.classList.add('active');
     } catch (err) {
       console.error('push toggle failed:', err);
-      alert('Could not update notification settings (' + (err.message || 'unknown error') + '). If your browser showed a permission prompt, it may need a response first — try clicking again.');
+      const detail = err && (err.name && err.message ? `${err.name}: ${err.message}` : err.message || err.name || String(err));
+      alert('Could not update notification settings (' + (detail || 'unknown error') + '). If your browser showed a permission prompt, it may need a response first — try clicking again.');
     } finally {
       btn.disabled = false;
     }
