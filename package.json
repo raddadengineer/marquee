@@ -1,6 +1,6 @@
 {
   "name": "marquee",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Marquee — a self-hosted dashboard for your Plex family",
   "main": "server.js",
   "type": "commonjs",

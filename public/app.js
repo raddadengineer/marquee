@@ -115,25 +115,39 @@ async function initNotifyToggle() {
   const existing = await registration.pushManager.getSubscription();
   btn.classList.toggle('active', !!existing);
 
+  // Every step here (service worker readiness, the browser's own permission
+  // prompt, the subscribe/unsubscribe call, the backend round trip) can fail
+  // or just never resolve — previously none of that was caught, so a denied/
+  // ignored permission prompt or a failed subscribe() left the click looking
+  // like it did nothing at all, with no error and no way to tell why.
   btn.addEventListener('click', async () => {
-    const reg = await navigator.serviceWorker.ready;
-    const current = await reg.pushManager.getSubscription();
-    if (current) {
-      await current.unsubscribe();
-      await api('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: current.endpoint }) });
-      btn.classList.remove('active');
-      return;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const current = await reg.pushManager.getSubscription();
+      if (current) {
+        await current.unsubscribe();
+        await api('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: current.endpoint }) });
+        btn.classList.remove('active');
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        alert('Notifications are blocked for this site — check your browser\'s site settings (usually the padlock/site info icon next to the address bar) to allow them, then try again.');
+        return;
+      }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(window.VAPID_PUBLIC_KEY)
+      });
+      await api('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+      btn.classList.add('active');
+    } catch (err) {
+      console.error('push toggle failed:', err);
+      alert('Could not update notification settings (' + (err.message || 'unknown error') + '). If your browser showed a permission prompt, it may need a response first — try clicking again.');
+    } finally {
+      btn.disabled = false;
     }
-    if (Notification.permission === 'denied') {
-      alert('Notifications are blocked for this site in your browser settings.');
-      return;
-    }
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(window.VAPID_PUBLIC_KEY)
-    });
-    await api('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
-    btn.classList.add('active');
   });
 }
 

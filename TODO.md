@@ -4,7 +4,7 @@ Every shipped feature or fix gets its own version bump now (`package.json`
 + `package-lock.json`) and its own section here — no more letting the
 version drift unversioned between batches. One bump per shipped unit of
 work: a new capability bumps minor, a fix bumps patch. **Current version:
-v1.4.1.**
+v1.4.2.**
 
 `v1.1.0` through `v1.4.1` below are a one-time retroactive reconstruction —
 package.json had said `1.1.0` since the batch that first added a version
@@ -25,6 +25,7 @@ gets versioned as it ships, not reconstructed later.
 - **v1.4.0** — track a release grab through to done
 - **v1.4.1** — fix batch: admin poster flicker, grab-status timing, Notice
   Board clipped text, avatar chip label
+- **v1.4.2** — fix: notification bell failed silently
 
 ---
 
@@ -509,5 +510,23 @@ gets versioned as it ships, not reconstructed later.
       top: 0; }`) rather than touching the shared class, since the request
       modal's usage is correct as-is. Verified the fresh cache-busted CSS
       URL actually serves the fix live.
+
+## v1.4.2 — Fix: notification bell failed silently
+
+- [x] **Fix**: the header bell (Web Push subscribe toggle) did nothing when
+      clicked, with no error and no way to tell why. Root cause: the click
+      handler had no error handling at all — service worker readiness, the
+      browser's own permission prompt, subscribe()/unsubscribe(), and the
+      backend round trip can all fail or (for an unanswered permission
+      prompt) just never resolve, and none of that was ever surfaced.
+      Wrapped the whole handler in try/catch with a clear alert() on
+      failure (matching the existing denied-permission alert already used
+      here), added a `btn.disabled` guard against double-clicks during the
+      async chain, and a matching `.icon-btn:disabled` style. Root cause of
+      the *specific* report is still unconfirmed (most likely either a
+      missed/unanswered browser permission prompt or notifications already
+      blocked at the browser level for this site) — the fix makes any of
+      those visible instead of silent, rather than claiming to have
+      reproduced the exact failure.
 
 ## Ideas
