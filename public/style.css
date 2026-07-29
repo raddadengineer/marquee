@@ -133,10 +133,6 @@ body {
   cursor: pointer; line-height: 1; text-decoration: none;
 }
 .icon-btn:hover { background: rgba(255,255,255,0.28); }
-.icon-btn:disabled { opacity: 0.55; cursor: default; }
-/* Notification bell, once subscribed — same amber the rest of the app uses
-   for "on"/active state (download progress bars, disk gauges). */
-.icon-btn.active { background: var(--amber); border-color: var(--amber); }
 /* An SVG child (admin-link-btn) defaults to inline, which leaves a few px of
    baseline whitespace under it even inside a flex-centered parent — block
    avoids that so it centers exactly like the text-glyph icon buttons do. */

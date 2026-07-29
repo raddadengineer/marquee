@@ -84,7 +84,6 @@ app.use('/api/owner', require('./routes/owner'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notice', require('./routes/notice'));
 app.use('/api/prowlarr', require('./routes/prowlarr'));
-app.use('/api/push', require('./routes/push'));
 
 // index.html carries a {{SITE_NAME}} placeholder so this same image can show a generic
 // "Marquee" brand out of the box, or your own (e.g. via SITE_NAME=MyPlexHub in .env).
@@ -112,10 +111,6 @@ const renderedHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'
   .replaceAll('{{SITE_NAME}}', siteName)
   .replace('{{TAGLINES_JSON}}', taglinesJson)
   .replaceAll('{{ASSET_VERSION}}', assetVersion)
-  // Empty when unset — the frontend's push-subscribe code checks for that and
-  // simply doesn't offer the toggle, same graceful-absence pattern as every
-  // other optional integration in this app.
-  .replaceAll('{{VAPID_PUBLIC_KEY}}', process.env.VAPID_PUBLIC_KEY || '')
   .replaceAll('{{APP_VERSION}}', appVersion)
   .replaceAll('{{COPYRIGHT_YEAR}}', copyrightYear);
 const renderedManifest = fs.readFileSync(path.join(__dirname, 'public', 'manifest.webmanifest'), 'utf8')

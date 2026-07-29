@@ -18,8 +18,6 @@
 <meta name="apple-mobile-web-app-title" content="{{SITE_NAME}}">
 
 <script>window.SITE_TAGLINES = {{TAGLINES_JSON}};</script>
-<!-- Base64url charset only (A-Za-z0-9-_) — safe to inline directly, same as SITE_NAME. -->
-<script>window.VAPID_PUBLIC_KEY = "{{VAPID_PUBLIC_KEY}}";</script>
 </head>
 <body>
 
@@ -53,12 +51,6 @@
         <div class="hero-icons">
           <button id="search-btn" class="icon-btn" aria-label="Request something">+</button>
           <button id="report-search-btn" class="icon-btn" aria-label="Report an issue">&#9873;</button>
-          <button id="notify-toggle-btn" class="icon-btn hidden" aria-label="Enable notifications">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-            </svg>
-          </button>
           <a id="admin-link-btn" href="/admin" class="icon-btn hidden" aria-label="Admin">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>

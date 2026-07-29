@@ -687,35 +687,44 @@ async function loadSeeding() {
 // Not actively downloading and not seeding/complete — i.e. actually stuck or
 // failed. Most torrents that are simply idling-while-seeding never show up
 // here at all (filtered server-side), so this is meant to stay short.
+function createDownloadIssueRow() {
+  const row = document.createElement('div');
+  row.className = 'dl-row';
+  row.innerHTML = `
+    <div class="dl-row-body">
+      <div class="now-title"></div>
+      <div class="now-meta"><span class="state-dot paused"></span><span class="dl-meta-text"></span></div>
+    </div>
+    <div class="pending-actions">
+      <button class="dl-action-btn pill-btn" data-action="pause"><span class="state-dot"></span><span class="btn-label">Pause</span></button>
+      <button class="dl-action-btn pill-btn hidden" data-action="force" title="Bypasses qBittorrent's own queue limits and retries even after errors — different from Resume, which still respects them"><span class="state-dot"></span><span class="btn-label">Force</span></button>
+      <button class="dl-remove-btn pill-btn"><span class="state-dot danger"></span><span class="btn-label">Remove</span></button>
+    </div>
+  `;
+  return row;
+}
+
+function updateDownloadIssueRow(row, d) {
+  row.dataset.id = d.id;
+  row.dataset.type = d.type;
+  row.querySelectorAll('button').forEach(b => b.disabled = false);
+  row.querySelector('.now-title').textContent = d.name;
+  row.querySelector('.dl-meta-text').textContent = `${d.type === 'torrent' ? 'Torrent' : 'Usenet'} · ${titleCase(d.state)}`;
+
+  const pauseResumeBtn = row.querySelector('[data-action="pause"], [data-action="resume"]');
+  pauseResumeBtn.dataset.action = d.state === 'paused' ? 'resume' : 'pause';
+  pauseResumeBtn.querySelector('.btn-label').textContent = d.state === 'paused' ? 'Resume' : 'Pause';
+
+  row.querySelector('[data-action="force"]').classList.toggle('hidden', d.type !== 'torrent');
+  row.querySelector('.dl-remove-btn .btn-label').textContent = 'Remove';
+}
+
 async function loadDownloadIssues() {
   const body = document.getElementById('download-issues-body');
   try {
     const items = await api('/api/downloads/queue/attention');
     if (!items.length) { body.innerHTML = '<p class="empty-state">Nothing stuck.</p>'; return; }
-    body.innerHTML = items.map(d => `
-      <div class="dl-row" data-id="${escapeHtml(d.id)}" data-type="${d.type}">
-        <div class="dl-row-body">
-          <div class="now-title">${escapeHtml(d.name)}</div>
-          <div class="now-meta">
-            <span class="state-dot paused"></span>
-            ${d.type === 'torrent' ? 'Torrent' : 'Usenet'} · ${titleCase(d.state)}
-          </div>
-        </div>
-        <div class="pending-actions">
-          <button class="dl-action-btn pill-btn" data-action="${d.state === 'paused' ? 'resume' : 'pause'}">
-            <span class="state-dot"></span><span class="btn-label">${d.state === 'paused' ? 'Resume' : 'Pause'}</span>
-          </button>
-          ${d.type === 'torrent' ? `
-            <button class="dl-action-btn pill-btn" data-action="force" title="Bypasses qBittorrent's own queue limits and retries even after errors — different from Resume, which still respects them">
-              <span class="state-dot"></span><span class="btn-label">Force</span>
-            </button>
-          ` : ''}
-          <button class="dl-remove-btn pill-btn">
-            <span class="state-dot danger"></span><span class="btn-label">Remove</span>
-          </button>
-        </div>
-      </div>
-    `).join('');
+    reconcileList(body, items, d => `${d.type}-${d.id}`, createDownloadIssueRow, updateDownloadIssueRow);
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not load download issues.</p>';
   }

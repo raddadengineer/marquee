@@ -3,8 +3,11 @@
 Every shipped feature or fix gets its own version bump now (`package.json`
 + `package-lock.json`) and its own section here — no more letting the
 version drift unversioned between batches. One bump per shipped unit of
-work: a new capability bumps minor, a fix bumps patch. **Current version:
-v1.4.3.**
+work: a new capability bumps minor, a fix bumps patch. `git commit`/push
+themselves now batch to every 10th shipped unit instead of running every
+time (version bumps, TODO.md sections, and live deploys still happen every
+time regardless — only the git commit action batches). **Current version:
+v1.5.1.**
 
 `v1.1.0` through `v1.4.1` below are a one-time retroactive reconstruction —
 package.json had said `1.1.0` since the batch that first added a version
@@ -28,6 +31,10 @@ gets versioned as it ships, not reconstructed later.
 - **v1.4.2** — fix: notification bell failed silently
 - **v1.4.3** — fix: bell's real root cause on Safari (implicit permission
   prompt unreliable there)
+- **v1.5.0** — Web Push removed entirely (notification bell, subscribe/
+  unsubscribe, VAPID)
+- **v1.5.1** — fix: Download Queue/Download Issues poster-blink-class DOM
+  churn on every poll
 
 ---
 
@@ -550,5 +557,85 @@ gets versioned as it ships, not reconstructed later.
       there's still more to learn from whatever Safari throws next. Deployed
       live; confirmation that this actually resolves it on Safari is
       pending a retry.
+
+## v1.5.0 — Web Push removed entirely
+
+- [x] Removed the notification bell and everything behind it: `lib/
+      pushNotify.js`, `lib/pushSubscriptions.js`, `routes/push.js`, the
+      `/api/push` mount in server.js, the `{{VAPID_PUBLIC_KEY}}` template
+      placeholder + script tag, the bell button + its CSS
+      (`.icon-btn.active`/`.icon-btn:disabled`), `initNotifyToggle()` +
+      `urlBase64ToUint8Array()` in app.js, the `push`/`notificationclick`
+      handlers in sw.js, the `pushNotify.notifyAll()` call in the Overseerr
+      webhook handler (the SSE `media-available` broadcast next to it is
+      untouched — that's the in-tab toast, a separate mechanism), the
+      `web-push` npm dependency (via `npm uninstall`, not hand-edited, so
+      package-lock.json stayed consistent), and the VAPID env var block from
+      `.env.example`. The in-app "Available now" SSE toast still works
+      exactly as before — this only removes the without-a-tab-open path.
+      `push.sqlite` (subscription storage) was left alone on disk rather
+      than deleted — orphaned but harmless.
+      <br>Removing `web-push` meant a real image rebuild, not just a
+      `docker cp` patch — and that surfaced a genuinely important gap along
+      the way: the host's actual build-context directory
+      (`/mnt/docker/skyn3t`, what `docker compose build` reads from) had
+      been stale since before this session even started — still had the
+      `/api/watchlist` route from before that removal, package.json still
+      at `1.1.0`. Every deploy this whole session had been `docker cp`
+      patches into the running container's writable layer only, which
+      never touches that source directory. A `docker compose build` at any
+      point would have silently reverted the *entire* session's work back
+      to a stale baseline. Fully re-synced the real local tree there first
+      (`rsync`, excluding `.git`/`node_modules`/`.env`/`data` — the last two
+      to protect the live secrets/sqlite dbs already on the host) before
+      rebuilding, and verified afterward that the NAS-specific Disk Space
+      feature (the most sensitive thing to lose) still returns real
+      physical-volume data post-rebuild, that `/api/watchlist` and
+      `/api/push` both 404, and that other recent auth-gated endpoints
+      (My Stats, grab-status) still respond correctly. Going forward, any
+      change needing a real rebuild (a dependency change, not just static
+      files) needs this same host-tree sync first, every time.
+
+## v1.5.1 — Fix: Download Queue/Download Issues DOM churn on every poll
+
+- [x] Ran a full performance + dead-code audit (unused functions/CSS/
+      dependencies, duplicate logic, commented-out code, render-blocking
+      resources, re-renders, bundle size, caching, N+1 patterns) at the
+      owner's request. Result: the codebase came back almost entirely
+      clean — zero unused functions (checked every `lib/` export
+      cross-file and every top-level function within `app.js`/`admin.js`),
+      zero unused CSS classes (206 checked, comments stripped first after
+      an initial false-positive pass), zero dead npm dependencies, zero
+      leftover debug `console.log`s, no render-blocking scripts (already
+      at the end of `<body>`), no missing lazy-loading, caching already
+      well-configured. One real finding: `/requests/mine`, `/requests/
+      pending`, and `/issues/open` each fire one Overseerr lookup per
+      item — investigated and *not* actionable, a pre-existing comment
+      already documents Overseerr's request/issue APIs have no bulk
+      title/poster lookup, and it's already parallelized; verified live
+      that the high-traffic `/search`/`/discover` endpoints don't have
+      this problem at all (Overseerr's own response already includes
+      title/posterPath directly). The only actionable item: Download
+      Queue (5s poll) and Download Issues (15s poll) were still doing a
+      full `innerHTML` rebuild every cycle — no `<img>` tags in either so
+      no visible flicker, but still unnecessary DOM churn on the app's
+      two most frequent polls.
+- [x] Converted both to the same `reconcileList`-by-key pattern already
+      proven on Now Playing/Recently Watched and 4 admin panels. Added a
+      matching `reconcileList` helper to `app.js` (mirrors the one already
+      in `admin.js` — the two pages don't share modules by design, no
+      bundler). Keyed by `${type}-${id}` (torrent hash / SABnzbd nzo_id
+      are separate namespaces, prefixed to rule out a coincidental
+      collision). Download Queue's owner-only Remove button and Download
+      Issues' Pause/Resume/Force buttons are now added/removed or toggled
+      in place on the persistent row rather than recreated — verified
+      every existing click-handler dependency (`row.dataset.hash`/`.name`
+      for the torrent-details click-through, `row.dataset.id`/`.type` for
+      pause/resume/force/remove) still lines up field-for-field. Both
+      queues were empty at deploy time, so this is verified by careful
+      manual trace-through + the proven track record of this exact
+      pattern elsewhere, not a live visual confirmation against real
+      non-empty data — worth a glance next time something's actually
+      downloading or stuck.
 
 ## Ideas

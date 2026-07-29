@@ -97,82 +97,6 @@ function showDashboard(owner) {
   // Everything owner-only (sign-ins, pending requests, issues, system status,
   // stack management) lives on its own page now instead of crowding this one.
   document.getElementById('admin-link-btn').classList.toggle('hidden', !isOwner);
-  initNotifyToggle();
-}
-
-// ---------- Push notifications ----------
-// "Available now" pushes (see lib/pushNotify.js) reach this device even
-// without a tab open, unlike the SSE toast they mirror. Button stays hidden
-// entirely if this deployment has no VAPID key configured, or the browser
-// doesn't support Push at all — same graceful-absence pattern as every other
-// optional integration in this app.
-async function initNotifyToggle() {
-  const btn = document.getElementById('notify-toggle-btn');
-  if (!window.VAPID_PUBLIC_KEY || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
-  btn.classList.remove('hidden');
-
-  const registration = await navigator.serviceWorker.ready;
-  const existing = await registration.pushManager.getSubscription();
-  btn.classList.toggle('active', !!existing);
-
-  // Every step here (service worker readiness, the browser's own permission
-  // prompt, the subscribe/unsubscribe call, the backend round trip) can fail
-  // or just never resolve — previously none of that was caught, so a denied/
-  // ignored permission prompt or a failed subscribe() left the click looking
-  // like it did nothing at all, with no error and no way to tell why.
-  btn.addEventListener('click', async () => {
-    if (btn.disabled) return;
-    btn.disabled = true;
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const current = await reg.pushManager.getSubscription();
-      if (current) {
-        await current.unsubscribe();
-        await api('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: current.endpoint }) });
-        btn.classList.remove('active');
-        return;
-      }
-      if (Notification.permission === 'denied') {
-        alert('Notifications are blocked for this site — check your browser\'s site settings (usually the padlock/site info icon next to the address bar) to allow them, then try again.');
-        return;
-      }
-      // Relying on subscribe() to implicitly trigger the permission prompt
-      // works on Chrome but isn't reliable on Safari — it can reject
-      // straight away with no prompt ever shown. Requesting permission
-      // explicitly first is the standard cross-browser-safe pattern.
-      if (Notification.permission === 'default') {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          alert(permission === 'denied'
-            ? 'Notifications weren\'t enabled — permission was denied.'
-            : 'Notifications weren\'t enabled — no response to the permission prompt.');
-          return;
-        }
-      }
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(window.VAPID_PUBLIC_KEY)
-      });
-      await api('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
-      btn.classList.add('active');
-    } catch (err) {
-      console.error('push toggle failed:', err);
-      const detail = err && (err.name && err.message ? `${err.name}: ${err.message}` : err.message || err.name || String(err));
-      alert('Could not update notification settings (' + (detail || 'unknown error') + '). If your browser showed a permission prompt, it may need a response first — try clicking again.');
-    } finally {
-      btn.disabled = false;
-    }
-  });
-}
-
-// Web Push's applicationServerKey needs a Uint8Array — VAPID public keys are
-// handed out base64url-encoded, this is the standard conversion (same as
-// MDN's own push notification guide).
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
 
 function setHeroDate() {
@@ -576,34 +500,92 @@ async function loadUpcoming() {
   }
 }
 
+// Shared by every poll-refreshed list here that would otherwise do a full
+// innerHTML rebuild every cycle — same problem and fix as Now Playing/
+// Recently Watched (see renderNowPlaying above) and admin.js's own
+// reconcileList: an existing row is created once and left alone, only
+// updateRow's fields refresh in place, so nothing gets torn down and
+// rebuilt just because a 5s/15s timer ticked with no real change.
+function reconcileList(container, items, keyOf, createRow, updateRow) {
+  const incomingKeys = new Set(items.map(item => String(keyOf(item))));
+  for (const row of container.querySelectorAll('[data-recon-key]')) {
+    if (!incomingKeys.has(row.dataset.reconKey)) row.remove();
+  }
+  if (!container.querySelector('[data-recon-key]')) container.innerHTML = ''; // clear an empty-state message
+  items.forEach(item => {
+    const key = String(keyOf(item));
+    let row = container.querySelector(`[data-recon-key="${key}"]`);
+    if (!row) {
+      row = createRow(item);
+      row.dataset.reconKey = key;
+    }
+    updateRow(row, item);
+    container.appendChild(row); // no-op DOM move if already in place — keeps row order matching items order
+  });
+}
+
 // ---------- Download Queue ----------
 // Actively downloading only, for everyone — anything stuck (paused, stalled,
 // errored) is an owner-only concern, see admin.js's "Download Issues"
 // section instead. Most of what "stuck" would otherwise include here is just
 // fully-downloaded torrents idling before/during seeding, which nobody
 // browsing this panel needs to see.
+function createDownloadRow() {
+  const row = document.createElement('div');
+  row.className = 'dl-row';
+  row.innerHTML = `
+    <div class="dl-row-body">
+      <div class="now-title"></div>
+      <div class="now-meta"><span class="state-dot"></span><span class="dl-meta-text"></span></div>
+      <div class="bar"><div class="bar-fill"></div></div>
+    </div>
+  `;
+  return row;
+}
+
+function updateDownloadRow(row, d) {
+  row.classList.toggle('dl-row-clickable', d.type === 'torrent');
+  if (d.type === 'torrent') {
+    row.dataset.hash = d.id;
+    row.dataset.name = d.name;
+  }
+  row.querySelector('.now-title').textContent = d.name;
+  row.querySelector('.state-dot').className = dotClass(d.state !== 'downloading');
+  row.querySelector('.dl-meta-text').textContent = [
+    d.type === 'torrent' ? 'Torrent' : 'Usenet',
+    titleCase(d.state),
+    d.speedKbps ? formatSpeed(d.speedKbps) : null,
+    d.etaSeconds != null ? formatEta(d.etaSeconds) : null
+  ].filter(Boolean).join(' · ');
+  row.querySelector('.bar-fill').style.width = d.progress + '%';
+
+  // Add/remove the button entirely rather than just hiding it, so the click
+  // handler's `.dl-remove-btn` lookup reliably reflects whether this row is
+  // actually actionable right now.
+  const wantsRemove = isOwner && d.type === 'torrent';
+  const removeBtn = row.querySelector('.dl-remove-btn');
+  if (wantsRemove && !removeBtn) {
+    const btn = document.createElement('button');
+    btn.className = 'dl-remove-btn pill-btn';
+    btn.innerHTML = '<span class="state-dot danger"></span><span class="btn-label">Remove</span>';
+    row.appendChild(btn);
+  } else if (!wantsRemove && removeBtn) {
+    removeBtn.remove();
+  } else if (removeBtn) {
+    removeBtn.disabled = false;
+    removeBtn.querySelector('.btn-label').textContent = 'Remove';
+  }
+}
+
 async function loadDownloads() {
   const body = document.getElementById('downloads-body');
   try {
     const items = await api('/api/downloads/queue');
     if (!items.length) { body.innerHTML = '<p class="empty-state">Nothing downloading.</p>'; return; }
-    body.innerHTML = items.map(d => `
-      <div class="dl-row${d.type === 'torrent' ? ' dl-row-clickable' : ''}"${d.type === 'torrent' ? ` data-hash="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name)}"` : ''}>
-        <div class="dl-row-body">
-          <div class="now-title">${escapeHtml(d.name)}</div>
-          <div class="now-meta">
-            <span class="${dotClass(d.state !== 'downloading')}"></span>
-            ${d.type === 'torrent' ? 'Torrent' : 'Usenet'} · ${titleCase(d.state)}${d.speedKbps ? ' · ' + formatSpeed(d.speedKbps) : ''}${d.etaSeconds != null ? ' · ' + formatEta(d.etaSeconds) : ''}
-          </div>
-          <div class="bar"><div class="bar-fill" style="width:${d.progress}%"></div></div>
-        </div>
-        ${isOwner && d.type === 'torrent' ? `
-          <button class="dl-remove-btn pill-btn">
-            <span class="state-dot danger"></span><span class="btn-label">Remove</span>
-          </button>
-        ` : ''}
-      </div>
-    `).join('');
+    // Torrent hash and SABnzbd nzo_id are separate namespaces — prefix by
+    // type so a coincidental collision between the two can't merge two
+    // different real downloads into one row.
+    reconcileList(body, items, d => `${d.type}-${d.id}`, createDownloadRow, updateDownloadRow);
   } catch (e) {
     body.innerHTML = '<p class="empty-state">Could not reach download clients.</p>';
   }
