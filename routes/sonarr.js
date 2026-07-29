@@ -4,6 +4,7 @@ const requireAuth = require('./requireAuth');
 const requireOwner = require('./requireOwner');
 const { mapReleases } = require('../lib/releaseSearch');
 const { mapFileInfo } = require('../lib/fileInfo');
+const { classifyQueueRecord } = require('../lib/grabStatus');
 const router = express.Router();
 
 router.get('/today', requireAuth, async (req, res) => {
@@ -222,6 +223,54 @@ router.post('/releases/grab', requireAuth, requireOwner, async (req, res) => {
   } catch (err) {
     console.error('sonarr grab error:', err.response?.data || err.message);
     res.status(502).json({ error: err.response?.data?.[0]?.errorMessage || 'Could not grab release' });
+  }
+});
+
+// Polled by the release-search modal after a grab so the row can keep
+// tracking through downloading -> importing -> done/failed instead of
+// freezing at "Grabbed ✓" with no idea what actually happened. Same
+// series/episode lookup as /releases above; queue records are per-episode
+// here (unlike Radarr's per-movie), so matched on episodeId.
+router.get('/grab-status', requireAuth, requireOwner, async (req, res) => {
+  const tvdbId = Number(req.query.tvdbId);
+  const season = Number(req.query.season);
+  const episode = Number(req.query.episode);
+  if (!Number.isInteger(tvdbId) || tvdbId <= 0 || !Number.isInteger(season) || !Number.isInteger(episode)) {
+    return res.status(400).json({ error: 'Invalid series/season/episode' });
+  }
+  try {
+    const { data: seriesList } = await axios.get(`${process.env.SONARR_URL}/api/v3/series`, {
+      params: { tvdbId },
+      headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+    });
+    const series = seriesList[0];
+    if (!series) return res.status(404).json({ error: 'Series not tracked in Sonarr' });
+
+    const { data: episodes } = await axios.get(`${process.env.SONARR_URL}/api/v3/episode`, {
+      params: { seriesId: series.id, seasonNumber: season },
+      headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+    });
+    const ep = episodes.find(e => e.episodeNumber === episode);
+    if (!ep) return res.status(404).json({ error: 'Episode not found in Sonarr' });
+
+    const { data: queueData } = await axios.get(`${process.env.SONARR_URL}/api/v3/queue`, {
+      params: { pageSize: 200 },
+      headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+    });
+    const rec = (queueData.records || []).find(r => r.episodeId === ep.id);
+    if (rec) return res.json(classifyQueueRecord(rec));
+
+    let file = null;
+    if (ep.hasFile && ep.episodeFileId) {
+      const { data: epFile } = await axios.get(`${process.env.SONARR_URL}/api/v3/episodefile/${ep.episodeFileId}`, {
+        headers: { 'X-Api-Key': process.env.SONARR_API_KEY }
+      });
+      file = mapFileInfo(epFile);
+    }
+    res.json({ stage: file ? 'done' : 'unknown', file });
+  } catch (err) {
+    console.error('sonarr grab-status error:', err.code || err.response?.status, err.message);
+    res.status(502).json({ error: 'Could not check status' });
   }
 });
 

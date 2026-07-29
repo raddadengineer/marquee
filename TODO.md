@@ -396,4 +396,29 @@
       real updates land ~10s apart matching Plex's own push cadence — the
       gap the 1s interpolation ticker is there to smooth over
 
+- [x] Track a grab through to done instead of freezing at "Grabbed ✓". Real
+      problem reported: the owner grabbed a replacement release for a
+      reported issue, saw "Grabbed", and had no idea whether it actually
+      downloaded or got imported without going to check Sonarr's own
+      Activity/History directly. The grabbed row now keeps polling in place
+      (same 4s cadence, new `/api/radarr/grab-status` and
+      `/api/sonarr/grab-status` endpoints) through Downloading (%/speed/ETA)
+      -> Importing -> Done (✓ Replaced, with the new file's quality/size) or
+      Failed (the real rejection reason + a "Fix it" button straight into
+      the existing manual-import flow). State classification
+      (`lib/grabStatus.js`, unit tested) reuses the exact same
+      trackedDownloadStatus/statusMessages fields the Import Issues panel
+      already keys off — nothing new on the Radarr/Sonarr integration side,
+      just surfaced live on the row instead of only after the fact in a
+      separate panel. Same shared `openReleaseModal` function backs Open
+      Issues, Wanted/Missing, and Search Library, so this applies to all
+      three without per-call-site changes. Mocked up first. Gives up
+      politely after 5 minutes of polling ("check Import Issues later")
+      rather than polling forever silently; closing the modal early loses
+      nothing since Import Issues independently catches any real stuck
+      import regardless. Verified against two real cases on the live
+      deployment: a genuinely stuck Sonarr import (exact real rejection
+      reason + downloadId returned) and a fully-imported movie (exact real
+      file quality/size/codec returned)
+
 ## Ideas

@@ -691,6 +691,24 @@ body {
 .release-rejections { font-size: 0.7rem; color: var(--danger); margin-top: 2px; }
 .grab-btn { flex-shrink: 0; }
 
+/* Post-grab tracking — a grabbed release row keeps evolving in place
+   (Grabbed -> Downloading -> Importing -> Done/Failed) instead of freezing
+   at "Grabbed ✓". Reuses the plain .bar/.bar-fill classes (not the .now-row-
+   scoped ones) since this isn't Now Playing. */
+.track-stage {
+  font-family: var(--mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--muted); display: flex; align-items: center; gap: 0.4rem; margin-top: 4px;
+}
+.track-stage .state-dot.amber { background: var(--amber); }
+.track-stage .state-dot.danger { background: var(--danger); }
+.track-stage .state-dot.pulse { animation: track-pulse 1.4s ease-in-out infinite; }
+@keyframes track-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.track-meta { font-size: 0.76rem; color: var(--muted); margin-top: 3px; }
+.track-result-ok { color: var(--teal); font-weight: 600; }
+.track-result-fail { color: var(--danger); }
+.release-row .bar { margin-top: 6px; }
+.fix-it-btn { border-color: rgba(214,69,69,0.35); color: var(--danger); margin-top: 0.5rem; }
+
 /* Settings modal (owner only) — service health grid + per-service/deployment
    edit popups. Saving anything restarts the container (see routes/settings.js),
    since Node only loads .env once at process start. */

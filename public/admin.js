@@ -273,6 +273,8 @@ async function openReleaseModal(ctx) {
   listEl.onclick = async e => {
     const btn = e.target.closest('.grab-btn');
     if (!btn) return;
+    const row = btn.closest('.release-row');
+    const releaseTitle = row.querySelector('.release-title').textContent;
     btn.disabled = true;
     btn.querySelector('.btn-label').textContent = 'Grabbing…';
     try {
@@ -280,12 +282,97 @@ async function openReleaseModal(ctx) {
         method: 'POST',
         body: JSON.stringify({ guid: btn.dataset.guid, indexerId: Number(btn.dataset.indexerId) })
       });
-      btn.querySelector('.btn-label').textContent = 'Grabbed ✓';
+      trackGrab(row, ctx, isMovie, releaseTitle);
     } catch (err) {
       btn.disabled = false;
       btn.querySelector('.btn-label').textContent = 'Grab';
     }
   };
+}
+
+// Turns the grabbed row into a live-tracked status instead of freezing at
+// "Grabbed ✓" — polls /grab-status (see routes/radarr.js / routes/sonarr.js)
+// every 4s and updates the same row in place through downloading -> importing
+// -> done/failed. Stops polling once the modal (and this row with it) is no
+// longer in the document, e.g. the owner closed it or searched again.
+function renderTrackRow(row, releaseTitle) {
+  row.innerHTML = `
+    <div class="release-info">
+      <div class="release-title" title="${escapeHtml(releaseTitle)}">${escapeHtml(releaseTitle)}</div>
+      <div class="track-stage"><span class="state-dot"></span><span class="stage-text">Grabbed</span></div>
+      <div class="track-meta">Waiting for the downloader…</div>
+      <div class="bar hidden"><div class="bar-fill"></div></div>
+    </div>
+  `;
+}
+
+function updateTrackRow(row, status, ctx, isMovie) {
+  const dotEl = row.querySelector('.state-dot');
+  const stageEl = row.querySelector('.stage-text');
+  const metaEl = row.querySelector('.track-meta');
+  const barEl = row.querySelector('.bar');
+  dotEl.className = 'state-dot';
+  barEl.classList.add('hidden');
+
+  if (status.stage === 'downloading') {
+    stageEl.textContent = 'Downloading';
+    dotEl.classList.add('amber');
+    barEl.classList.remove('hidden');
+    row.querySelector('.bar-fill').style.width = (status.progress ?? 0) + '%';
+    metaEl.textContent = [
+      status.progress != null ? `${status.progress}%` : null,
+      status.eta != null ? formatEta(status.eta) : null
+    ].filter(Boolean).join(' · ');
+  } else if (status.stage === 'importing') {
+    stageEl.textContent = 'Importing';
+    dotEl.classList.add('amber', 'pulse');
+    metaEl.textContent = 'Matching file into the library…';
+  } else if (status.stage === 'done') {
+    stageEl.textContent = 'Done';
+    metaEl.innerHTML = `<span class="track-result-ok">&#10003; Replaced</span> · ${escapeHtml(formatFileDetails(status.file))}`;
+  } else if (status.stage === 'failed') {
+    stageEl.textContent = 'Import failed';
+    dotEl.classList.add('danger');
+    metaEl.innerHTML = `<span class="track-result-fail">${escapeHtml(status.reason)}</span>`;
+    if (status.downloadId) {
+      const fixBtn = document.createElement('button');
+      fixBtn.className = 'pill-btn fix-it-btn';
+      fixBtn.innerHTML = '<span class="btn-label">Fix it &#8594;</span>';
+      fixBtn.addEventListener('click', () => openManualImportModal(isMovie ? 'radarr' : 'sonarr', status.downloadId, ctx.title));
+      row.querySelector('.release-info').appendChild(fixBtn);
+    }
+  } else {
+    stageEl.textContent = 'Grabbed';
+    metaEl.textContent = 'Waiting for the downloader…';
+  }
+}
+
+const GRAB_TRACK_TIMEOUT_MS = 5 * 60 * 1000;
+const GRAB_TRACK_INTERVAL_MS = 4000;
+
+function trackGrab(row, ctx, isMovie, releaseTitle) {
+  renderTrackRow(row, releaseTitle);
+  const statusUrl = isMovie
+    ? `/api/radarr/grab-status?tmdbId=${ctx.tmdbId}`
+    : `/api/sonarr/grab-status?tvdbId=${ctx.tvdbId}&season=${ctx.season}&episode=${ctx.episode}`;
+  const startedAt = Date.now();
+
+  const poll = async () => {
+    if (!document.body.contains(row)) return; // modal closed / list re-rendered since
+    try {
+      const status = await api(statusUrl);
+      updateTrackRow(row, status, ctx, isMovie);
+      if (status.stage === 'done' || status.stage === 'failed') return; // terminal
+    } catch (e) {
+      // Transient network hiccup — just try again next tick.
+    }
+    if (Date.now() - startedAt > GRAB_TRACK_TIMEOUT_MS) {
+      row.querySelector('.track-meta').textContent = 'Taking a while — check Import Issues later.';
+      return;
+    }
+    setTimeout(poll, GRAB_TRACK_INTERVAL_MS);
+  };
+  poll();
 }
 
 document.getElementById('close-release-modal-btn').addEventListener('click', () => {
