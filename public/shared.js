@@ -29,6 +29,16 @@ function formatDate(iso) {
 function formatSpeed(kbps) {
   return kbps >= 1024 ? `${(kbps / 1024).toFixed(1)} MB/s` : `${kbps} KB/s`;
 }
+// mm:ss below an hour, h:mm:ss at or above — same threshold Tautulli's own
+// activity view uses for its elapsed/total counters.
+function formatDuration(ms) {
+  const totalSec = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const sec = totalSec % 60;
+  const ss = String(sec).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
 function formatEta(seconds) {
   if (seconds >= 3600) return `${Math.round(seconds / 3600)}h left`;
   if (seconds >= 60) return `${Math.round(seconds / 60)}m left`;

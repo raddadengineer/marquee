@@ -245,6 +245,14 @@ body {
 .bar { height: 5px; background: rgba(20,25,35,0.08); border-radius: 3px; margin-top: 7px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--amber); }
 
+/* Now Playing only — elapsed/total + ETA above the bar. Scoped to .now-row
+   (not a global .bar override) since Download Queue/torrent file rows reuse
+   the same .bar/.bar-fill classes and shouldn't be affected. */
+.now-eta { font-family: var(--mono); font-size: 0.64rem; color: var(--muted); text-align: right; line-height: 1.15; white-space: nowrap; }
+.now-eta .sep { opacity: 0.5; margin: 0 0.3em; }
+.now-eta .eta-val { color: var(--text); font-weight: 500; }
+.now-row .bar { margin-top: 2px; }
+
 /* Disk Space panel's per-volume gauge — same amber/danger semantics as
    .bar-fill/.state-dot.danger, just circular instead of linear. pathLength="100"
    on both circles lets stroke-dasharray take a plain percentage directly,

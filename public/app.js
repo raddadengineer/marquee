@@ -336,6 +336,7 @@ function renderNowPlaying({ sessions, totalBandwidthKbps }) {
           <div style="flex:1; min-width:0;">
             <div class="now-title"></div>
             <div class="now-meta"><span class="state-dot"></span><span class="now-meta-text"></span> · <span class="state-word"></span></div>
+            <div class="now-eta"></div>
             <div class="bar"><div class="bar-fill"></div></div>
           </div>
         `;
@@ -346,6 +347,7 @@ function renderNowPlaying({ sessions, totalBandwidthKbps }) {
       row.querySelector('.now-meta-text').textContent = `${s.user || ''} · ${s.quality || ''}`;
       row.querySelector('.state-word').textContent = s.state;
       row.querySelector('.bar-fill').style.width = s.progress + '%';
+      updateNowEta(row, s);
       body.appendChild(row); // no-op DOM move if already in place — keeps row order matching sessions order
     });
   }
@@ -354,6 +356,21 @@ function renderNowPlaying({ sessions, totalBandwidthKbps }) {
   // worth re-rendering when that count actually changed, not on every
   // safety-net refresh (its own data doesn't change on that cadence anyway).
   if (sessionCountChanged) renderRecentlyWatched();
+}
+
+// Elapsed/total runtime + a wall-clock ETA, shown above the progress bar —
+// both computed client-side from data every session already carries
+// (progress % + durationMs), no new backend field needed. Recomputed on
+// every live update (both the full snapshot and the lightweight per-event
+// patch below) so it stays accurate through pauses rather than just ticking
+// on a fixed timer.
+function updateNowEta(row, s) {
+  const el = row.querySelector('.now-eta');
+  if (!s.durationMs) { el.textContent = ''; return; }
+  const elapsedMs = s.durationMs * (s.progress / 100);
+  const remainingMs = Math.max(0, s.durationMs - elapsedMs);
+  const eta = new Date(Date.now() + remainingMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  el.innerHTML = `${formatDuration(elapsedMs)}<span class="sep">/</span>${formatDuration(s.durationMs)}<span class="sep">·</span>ETA <span class="eta-val">${eta}</span>`;
 }
 
 function patchNowPlayingRow({ sessionKey, state, progress }) {
@@ -365,6 +382,7 @@ function patchNowPlayingRow({ sessionKey, state, progress }) {
   row.querySelector('.state-dot').classList.toggle('paused', state === 'paused');
   row.querySelector('.state-word').textContent = state;
   row.querySelector('.bar-fill').style.width = progress + '%';
+  updateNowEta(row, s);
 }
 
 // ---------- Recently Watched ----------

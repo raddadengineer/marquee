@@ -345,4 +345,21 @@
       untouched aside from re-pointing at the still-separate `.state-word`
       span. Verified live: clean restart, no errors
 
+- [x] Now Playing shows elapsed/total runtime + a wall-clock ETA above the
+      progress bar (e.g. "10:49 / 23:00 · ETA 9:12 PM"), adapted from
+      Tautulli's own activity view. Both computed entirely client-side from
+      data every session already carries (progress % + durationMs) — no new
+      backend field. `formatDuration` (shared.js) does mm:ss below an hour,
+      h:mm:ss at or above; ETA is `now + time remaining`, recomputed on every
+      live update (the full snapshot and the lightweight per-event patch
+      alike) so it stays right through pauses. Mocked up first before
+      building — the mockup surfaced that Tautulli's screenshot doesn't
+      actually show a distinct "buffered ahead" bar segment either, just
+      this same elapsed/ETA overlay, so that's what got built. CSS scoped to
+      `.now-row .bar` rather than a global `.bar` override, since Download
+      Queue/torrent file rows reuse the same `.bar`/`.bar-fill` classes.
+      Verified the formatting logic by hand against known inputs; live
+      verification of the on-screen result still pending an active session
+      to check against (none running at deploy time)
+
 ## Ideas
