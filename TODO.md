@@ -460,4 +460,8 @@
       `done`; `since=`(a day before the real dateAdded) correctly still
       returns `done`; no `since` at all matches the prior behavior exactly
 
+- [x] Avatar chip subtitle changed from "Signed in" to "My Stats" — the
+      chip was already clickable (opens My Stats), but "Signed in" read as
+      plain status text with no hint it was tappable. Mocked up first.
+
 ## Ideas
