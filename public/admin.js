@@ -415,10 +415,14 @@ const GRAB_TRACK_INTERVAL_MS = 4000;
 
 function trackGrab(row, ctx, isMovie, releaseTitle) {
   renderTrackRow(row, releaseTitle);
-  const statusUrl = isMovie
-    ? `/api/radarr/grab-status?tmdbId=${ctx.tmdbId}`
-    : `/api/sonarr/grab-status?tvdbId=${ctx.tvdbId}&season=${ctx.season}&episode=${ctx.episode}`;
   const startedAt = Date.now();
+  // Passed through as `since` so the server can tell a freshly-imported
+  // file apart from one that was already there before this grab (the
+  // "resolve an issue" flow replaces an existing file, so hasFile alone
+  // isn't confirmation — see isFileFromThisGrab in lib/grabStatus.js).
+  const statusUrl = isMovie
+    ? `/api/radarr/grab-status?tmdbId=${ctx.tmdbId}&since=${startedAt}`
+    : `/api/sonarr/grab-status?tvdbId=${ctx.tvdbId}&season=${ctx.season}&episode=${ctx.episode}&since=${startedAt}`;
 
   const poll = async () => {
     if (!document.body.contains(row)) return; // modal closed / list re-rendered since

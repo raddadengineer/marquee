@@ -443,4 +443,21 @@
       Sonarr queue) still return data matching exactly what the new render
       functions expect, clean restart with no new errors
 
+- [x] **Fix**: grab tracking jumped straight to "Replaced" instead of
+      showing Downloading/Importing. Root cause: the "resolve an issue"
+      flow exists specifically to replace a file that's already there, so
+      `hasFile` on the movie/episode is true *before* the grab too — the
+      grab-status endpoint's "not in the queue yet" fallback treated any
+      existing file as proof this specific grab had already succeeded.
+      Fixed by passing `since` (the grab's start time, captured client-side)
+      through to `/grab-status`, and added `isFileFromThisGrab` (lib/
+      grabStatus.js, unit tested) — only counts as done once the file's own
+      `dateAdded` is at/after that timestamp (small buffer for clock skew
+      between this server and Radarr/Sonarr's host). No `since` given falls
+      back to the old (immediate) behavior, so nothing else that might call
+      this endpoint breaks. Verified against Supergirl's real pre-existing
+      file live: `since=now` correctly returns `unknown` instead of
+      `done`; `since=`(a day before the real dateAdded) correctly still
+      returns `done`; no `since` at all matches the prior behavior exactly
+
 ## Ideas

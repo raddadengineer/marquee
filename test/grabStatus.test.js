@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { classifyQueueRecord } = require('../lib/grabStatus');
+const { classifyQueueRecord, isFileFromThisGrab } = require('../lib/grabStatus');
 
 test('classifyQueueRecord reports failed with the joined statusMessages when tracked status is not ok', () => {
   const rec = {
@@ -46,4 +46,30 @@ test('classifyQueueRecord handles a missing size gracefully (no progress rather 
   const result = classifyQueueRecord(rec);
   assert.equal(result.stage, 'downloading');
   assert.equal(result.progress, null);
+});
+
+test('isFileFromThisGrab assumes yes when no baseline was given', () => {
+  assert.equal(isFileFromThisGrab({ dateAdded: '2020-01-01T00:00:00Z' }, 0), true);
+});
+
+test('isFileFromThisGrab rejects a file that predates the grab — the "replace a bad file" case', () => {
+  const sinceMs = new Date('2026-07-29T12:00:00Z').getTime();
+  const file = { dateAdded: '2026-07-01T00:00:00Z' }; // the old file already on disk, unrelated to this grab
+  assert.equal(isFileFromThisGrab(file, sinceMs), false);
+});
+
+test('isFileFromThisGrab accepts a file added after the grab started', () => {
+  const sinceMs = new Date('2026-07-29T12:00:00Z').getTime();
+  const file = { dateAdded: '2026-07-29T12:00:05Z' };
+  assert.equal(isFileFromThisGrab(file, sinceMs), true);
+});
+
+test('isFileFromThisGrab tolerates a small amount of clock skew', () => {
+  const sinceMs = new Date('2026-07-29T12:00:00Z').getTime();
+  const file = { dateAdded: '2026-07-29T11:59:55Z' }; // 5s "before", within the buffer
+  assert.equal(isFileFromThisGrab(file, sinceMs), true);
+});
+
+test('isFileFromThisGrab rejects when there is no file at all', () => {
+  assert.equal(isFileFromThisGrab(null, Date.now()), false);
 });

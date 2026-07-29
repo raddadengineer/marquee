@@ -4,7 +4,7 @@ const requireAuth = require('./requireAuth');
 const requireOwner = require('./requireOwner');
 const { mapReleases } = require('../lib/releaseSearch');
 const { mapFileInfo } = require('../lib/fileInfo');
-const { classifyQueueRecord } = require('../lib/grabStatus');
+const { classifyQueueRecord, isFileFromThisGrab } = require('../lib/grabStatus');
 const router = express.Router();
 
 router.get('/upcoming', requireAuth, async (req, res) => {
@@ -164,14 +164,21 @@ router.get('/grab-status', requireAuth, requireOwner, async (req, res) => {
 
     // Not in the queue at all — either already imported, or nothing has
     // reached Radarr's queue yet (right after a grab, before it's picked up
-    // the release). Current file info is the simplest confirmation either
-    // way: present means done, absent means still waiting.
+    // the release). A file being present isn't enough on its own, though —
+    // this flow exists specifically to replace a file that was already
+    // there (a reported issue), so hasFile is true both before and after a
+    // real replace. Only counts as done once that file's own dateAdded is
+    // at/after this grab's start time (see isFileFromThisGrab).
     let file = null;
     if (movie.hasFile && movie.movieFileId) {
       const { data: mf } = await axios.get(`${process.env.RADARR_URL}/api/v3/moviefile/${movie.movieFileId}`, {
         headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
       });
       file = mapFileInfo(mf);
+    }
+    const sinceMs = Number(req.query.since) || 0;
+    if (file && !isFileFromThisGrab(file, sinceMs)) {
+      return res.json({ stage: 'unknown' });
     }
     res.json({ stage: file ? 'done' : 'unknown', file });
   } catch (err) {
