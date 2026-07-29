@@ -607,6 +607,60 @@ function renderTopMonthTile(label, items, isUser) {
   `;
 }
 
+// ---------- My Stats ----------
+// Personal, per-signed-in-user numbers behind the request modal's fourth
+// tab — a big hero number (hours watched), three quick stat tiles, and a
+// top-3 most-watched list reusing the same gold/silver/bronze medal markup
+// Top of the Month uses above, just as a compact stack instead of a big tile.
+async function loadMyStats() {
+  const body = document.getElementById('mystats-body');
+  try {
+    const s = await api('/api/tautulli/my-stats');
+    const tiles = [
+      { val: s.rank ? `#${s.rank.position}` : '—', lbl: 'Family Rank', cls: 'teal' },
+      { val: s.streakDays ? `${s.streakDays} day${s.streakDays === 1 ? '' : 's'}` : '—', lbl: 'Binge Streak', cls: 'amber' },
+      { val: s.playsThisMonth, lbl: 'Plays This Month', cls: '' }
+    ];
+    const [first, second, third] = s.topWatched || [];
+    const medalCells = (item, medal, cls) => item ? `
+      <span class="medal-badge">${medal}</span>
+      <span class="medal-name ${cls}">${escapeHtml(item.title)}</span>
+      <span class="medal-plays">${item.plays}</span>
+    ` : '';
+    body.innerHTML = `
+      <div class="stat-hero">
+        <div><span class="stat-hero-num">${s.hours}</span><span class="stat-hero-unit">hrs watched</span></div>
+        <div class="stat-hero-cap">Last 12 months</div>
+      </div>
+      <div class="stat-tiles">
+        ${tiles.map(t => `
+          <div class="stat-tile">
+            <div class="stat-tile-val ${t.cls}">${t.val}</div>
+            <div class="stat-tile-lbl">${t.lbl}</div>
+          </div>
+        `).join('')}
+      </div>
+      ${first ? `
+        <div class="card-label">Most Watched</div>
+        <div class="top-watched-first">
+          <div class="top-watched-frame"><img src="${first.thumb || ''}" loading="lazy" onerror="this.style.visibility='hidden'"></div>
+          <div>
+            <span class="top-watched-medal">🥇</span>
+            <div class="top-watched-title">${escapeHtml(first.title)}</div>
+            <div class="top-watched-plays">${first.plays} play${first.plays === 1 ? '' : 's'}</div>
+          </div>
+        </div>
+        <div class="medal-rows">
+          ${medalCells(second, '🥈', 'silver')}
+          ${medalCells(third, '🥉', 'bronze')}
+        </div>
+      ` : '<p class="empty-state">Nothing watched yet this year.</p>'}
+    `;
+  } catch (e) {
+    body.innerHTML = '<p class="empty-state">Could not reach Tautulli.</p>';
+  }
+}
+
 // ---------- Request modal ----------
 const modal = document.getElementById('request-modal');
 function openRequestModal() {
@@ -621,6 +675,19 @@ function openRequestModal() {
 // trigger the same modal.
 document.getElementById('search-btn').addEventListener('click', openRequestModal);
 document.getElementById('fab-request-btn').addEventListener('click', openRequestModal);
+// Avatar chip jumps straight to the My Stats tab instead of landing on the
+// default Search tab — same modal, just a different entry point.
+function openMyStats() {
+  openRequestModal();
+  document.getElementById('tab-mystats-btn').click();
+}
+const avatarChipBtn = document.getElementById('avatar-chip-btn');
+avatarChipBtn.addEventListener('click', openMyStats);
+avatarChipBtn.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  openMyStats();
+});
 document.getElementById('close-modal-btn').addEventListener('click', () => {
   modal.classList.add('hidden');
   closeSeasonPicker();
@@ -634,7 +701,8 @@ document.getElementById('close-modal-btn').addEventListener('click', () => {
 const modalTabs = [
   { btn: document.getElementById('tab-search-btn'), pane: document.getElementById('search-tab') },
   { btn: document.getElementById('tab-myrequests-btn'), pane: document.getElementById('myrequests-tab') },
-  { btn: document.getElementById('tab-watchlist-btn'), pane: document.getElementById('watchlist-tab') }
+  { btn: document.getElementById('tab-watchlist-btn'), pane: document.getElementById('watchlist-tab') },
+  { btn: document.getElementById('tab-mystats-btn'), pane: document.getElementById('mystats-tab') }
 ];
 function activateTab(btn) {
   for (const t of modalTabs) {
@@ -646,6 +714,7 @@ function activateTab(btn) {
 
 let myRequestsLoaded = false;
 let watchlistLoaded = false;
+let myStatsLoaded = false;
 
 modalTabs[0].btn.addEventListener('click', () => activateTab(modalTabs[0].btn));
 
@@ -665,6 +734,14 @@ modalTabs[2].btn.addEventListener('click', () => {
   if (!watchlistLoaded) {
     watchlistLoaded = true;
     loadWatchlist();
+  }
+});
+
+modalTabs[3].btn.addEventListener('click', () => {
+  activateTab(modalTabs[3].btn);
+  if (!myStatsLoaded) {
+    myStatsLoaded = true;
+    loadMyStats();
   }
 });
 

@@ -65,7 +65,7 @@
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
           </a>
-          <div class="avatar-chip">
+          <div class="avatar-chip" id="avatar-chip-btn" role="button" tabindex="0" aria-label="View your stats">
             <div class="avatar"></div>
             <div><div class="avatar-name" id="whoami"></div><div class="avatar-role">Signed in</div></div>
           </div>
@@ -161,6 +161,7 @@
       <button id="tab-search-btn" class="modal-tab pill-btn active"><span class="state-dot"></span>Search</button>
       <button id="tab-myrequests-btn" class="modal-tab pill-btn"><span class="state-dot"></span>My Requests</button>
       <button id="tab-watchlist-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Watchlist</button>
+      <button id="tab-mystats-btn" class="modal-tab pill-btn"><span class="state-dot"></span>My Stats</button>
     </div>
 
     <div id="search-tab">
@@ -176,6 +177,10 @@
     <div id="watchlist-tab" class="hidden">
       <div id="watchlist-label" class="discover-label">Your Plex Watchlist — tap Request to grab anything you don't have yet</div>
       <div id="watchlist-list" class="search-results"><p class="empty-state">Loading…</p></div>
+    </div>
+
+    <div id="mystats-tab" class="hidden">
+      <div id="mystats-body"><p class="empty-state">Loading…</p></div>
     </div>
 
     <div id="season-picker" class="season-picker hidden">

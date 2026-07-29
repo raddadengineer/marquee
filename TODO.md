@@ -275,4 +275,30 @@
       under the original number. Verified live on both pages, correctly
       showing this deployment's site name, the new version, and the year
 
+- [x] Releasing Soon now shows a "Downloaded" status label under any movie
+      already in the library, matching Airing Today's existing Airing/
+      Downloaded pattern — the /api/radarr/upcoming endpoint already
+      returned `hasFile`, so this was frontend-only. Caught a real bug in
+      the process: the deploy landed on disk via `docker cp` but the
+      container was never restarted, so the immutable-cached `app.js?v=...`
+      bundle from the perf-audit caching scheme kept serving the old code
+      to browsers/Cloudflare regardless — restarting to bump the deploy
+      timestamp fixed it. Static frontend deploys now always restart, not
+      just backend changes
+- [x] My Stats — a fourth tab in the request modal (Search / My Requests /
+      Watchlist / My Stats), reachable from the avatar chip which is now
+      clickable. Per-signed-in-user, same pattern as My Requests: hours
+      watched (last 12 months) as a hero number, family rank/binge streak/
+      plays-this-month as tiles, and a top-3 most-watched list reusing Top
+      of the Month's medal styling. Hours/plays-this-month come from
+      Tautulli's get_user_watch_time_stats (one call covers both windows);
+      binge streak and most-watched are computed from raw get_history rows
+      (lib/myStats.js, unit tested); family rank reuses the same
+      get_home_stats call Top of the Month already makes, just widened to
+      365 days. Discovered get_history has no grandparent_thumb (unlike
+      get_recently_added) — fixed by fetching a real poster via
+      get_metadata for just the top-3 results, not every group. Verified
+      live end-to-end against real data (716 hrs/year, rank #2 of 50, real
+      Naruto Shippūden/My Hero Academia/K-ON! posters)
+
 ## Ideas

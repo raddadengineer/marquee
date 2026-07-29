@@ -3,6 +3,7 @@ const axios = require('axios');
 const requireAuth = require('./requireAuth');
 const nowPlaying = require('../lib/nowPlaying');
 const { imageUrl } = require('../lib/plexImage');
+const { computeStreak, computeTopWatched, computeRank } = require('../lib/myStats');
 const router = express.Router();
 
 // Helper: lists every Plex library Tautulli knows about, with its section_id.
@@ -135,6 +136,17 @@ async function fetchSeriesSummary(ratingKey) {
   }
 }
 
+async function fetchThumb(ratingKey) {
+  try {
+    const { data } = await axios.get(`${process.env.TAUTULLI_URL}/api/v2`, {
+      params: { apikey: process.env.TAUTULLI_API_KEY, cmd: 'get_metadata', rating_key: ratingKey }
+    });
+    return data.response.data?.thumb || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 router.get('/recently-added', requireAuth, async (req, res) => {
   const { TAUTULLI_SECTION_MOVIES, TAUTULLI_SECTION_TV, TAUTULLI_SECTION_ANIME } = process.env;
   try {
@@ -253,6 +265,59 @@ router.get('/top-of-month', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('tautulli top-of-month error:', err.code || err.response?.status, err.message);
+    res.status(502).json({ error: 'Could not reach Tautulli' });
+  }
+});
+
+// Personal, per-signed-in-user stats behind a "My Stats" tab next to My
+// Requests/Watchlist — hours watched + plays this month come from Tautulli's
+// own get_user_watch_time_stats (one call covers both windows), while binge
+// streak and most-watched are computed here from raw get_history rows (see
+// lib/myStats.js) since Tautulli has no per-user equivalent of its own
+// get_home_stats leaderboard. Family rank reuses that same get_home_stats
+// call Top of the Month already relies on, just widened to 365 days and
+// matched against this user's id instead of only taking the top 3.
+router.get('/my-stats', requireAuth, async (req, res) => {
+  const userId = req.session.user.id;
+  try {
+    const oneYearAgo = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+    const apikey = process.env.TAUTULLI_API_KEY;
+    const base = `${process.env.TAUTULLI_URL}/api/v2`;
+
+    const [watchTime, historyRes, homeStats] = await Promise.all([
+      axios.get(base, { params: { apikey, cmd: 'get_user_watch_time_stats', user_id: userId, query_days: '30,365' } }),
+      axios.get(base, { params: { apikey, cmd: 'get_history', user_id: userId, after: oneYearAgo, length: 1000, order_column: 'date', order_dir: 'desc' } }),
+      axios.get(base, { params: { apikey, cmd: 'get_home_stats', time_range: 365, stats_type: 'plays', stats_count: 50 } })
+    ]);
+
+    const windows = watchTime.data.response.data || [];
+    const yearStats = windows.find(w => String(w.query_days) === '365') || {};
+    const monthStats = windows.find(w => String(w.query_days) === '30') || {};
+
+    const historyRows = historyRes.data.response.data.data || [];
+    const streakDays = computeStreak(historyRows);
+    // get_history has no grandparent_thumb (unlike get_recently_added), so
+    // the real poster is fetched per top-3 result only, same fetch-on-demand
+    // pattern fetchSeriesSummary above already uses for missing overviews.
+    const topGroups = computeTopWatched(historyRows);
+    const topWatched = await Promise.all(topGroups.map(async g => ({
+      title: g.title,
+      plays: g.plays,
+      thumb: imageUrl(await fetchThumb(g.ratingKey))
+    })));
+
+    const topUsersRows = (homeStats.data.response.data || []).find(s => s.stat_id === 'top_users')?.rows || [];
+    const position = computeRank(topUsersRows, userId);
+
+    res.json({
+      hours: Math.round((yearStats.total_time || 0) / 3600),
+      playsThisMonth: monthStats.total_plays || 0,
+      streakDays,
+      rank: position ? { position, of: topUsersRows.length } : null,
+      topWatched
+    });
+  } catch (err) {
+    console.error('tautulli my-stats error:', err.code || err.response?.status, err.message);
     res.status(502).json({ error: 'Could not reach Tautulli' });
   }
 });
