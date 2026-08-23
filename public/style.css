@@ -183,11 +183,12 @@ body {
   padding: 3rem 2.25rem;
   border-radius: 20px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: var(--card);
+  border: 1px solid var(--card-border);
   backdrop-filter: blur(22px) saturate(1.4);
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
-  box-shadow: 0 30px 60px -30px rgba(20, 25, 35, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: var(--card-shadow);
+  color: var(--text);
 }
 
 .tagline {
@@ -890,16 +891,16 @@ body {
 }
 
 /* ---------- My Stats tab ---------- */
-.stat-hero { text-align: center; padding: 0.4rem 0.5rem 1.1rem; border-bottom: 1px solid rgba(20,25,35,0.08); margin-bottom: 1rem; }
+.stat-hero { text-align: center; padding: 0.4rem 0.5rem 1.1rem; border-bottom: 1px solid var(--input-border); margin-bottom: 1rem; }
 .stat-hero-num {
-  font-family: var(--display); font-weight: 700; font-size: 2.5rem; line-height: 1; letter-spacing: -0.01em;
+  font-family: var(--display); font-weight: 700; font-size: 2.5rem; line-height: 1; letter-spacing: -0.01em; color: var(--text);
 }
 .stat-hero-unit { font-size: 1.05rem; font-weight: 500; color: var(--muted); margin-left: 0.15rem; }
 .stat-hero-cap { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.4rem; }
 .stat-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1.2rem; }
 .mystats-tile {
-  background: rgba(20,25,35,0.03); border: 1px solid rgba(20,25,35,0.06); border-radius: 12px;
-  padding: 0.65rem 0.55rem; text-align: center;
+  background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px;
+  padding: 0.65rem 0.55rem; text-align: center; color: var(--text);
 }
 .stat-tile-val { font-family: var(--display); font-weight: 600; font-size: 1.15rem; color: var(--teal); }
 .stat-tile-val.amber { color: var(--amber); }
@@ -927,11 +928,11 @@ body {
 .chart-legend .dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 0.4rem; vertical-align: -1px; }
 .chart-legend .dot.movies { background: var(--teal); }
 .chart-legend .dot.tv { background: var(--amber); }
-.chart-title { font-family: var(--display); font-weight: 600; font-size: 0.86rem; margin-bottom: 0.6rem; }
+.chart-title { font-family: var(--display); font-weight: 600; font-size: 0.86rem; margin-bottom: 0.6rem; color: var(--text); }
 
 .dow-chart {
   display: flex; align-items: flex-end; gap: 0.55rem; height: 108px;
-  border-bottom: 1px solid rgba(20,25,35,0.12);
+  border-bottom: 1px solid var(--input-border);
 }
 .dow-col {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
@@ -946,7 +947,7 @@ body {
 
 .hod-chart {
   display: flex; align-items: flex-end; gap: 2px; height: 84px;
-  border-bottom: 1px solid rgba(20,25,35,0.12);
+  border-bottom: 1px solid var(--input-border);
 }
 .hod-col {
   flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%;
@@ -973,7 +974,7 @@ body {
 .ups-status {
   padding-bottom: 0.85rem;
   margin-bottom: 0.85rem;
-  border-bottom: 1px solid rgba(20, 25, 35, 0.06);
+  border-bottom: 1px solid var(--input-border);
 }
 
 .monitor-pills {
@@ -990,8 +991,9 @@ body {
   font-size: 0.72rem;
   padding: 0.3rem 0.6rem;
   border-radius: 20px;
-  background: rgba(20, 25, 35, 0.04);
-  border: 1px solid rgba(20, 25, 35, 0.08);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text);
 }
 
 /* ---------- Poster grids ---------- */
@@ -1105,8 +1107,9 @@ body {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(20, 25, 35, 0.35);
-  backdrop-filter: blur(4px);
+  background: var(--modal-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -1121,8 +1124,8 @@ body {
      force it past the width cap above instead of wrapping/shrinking, which is
      what pushed the report modal off the right edge on mobile. */
   min-width: 0;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: var(--modal-card);
+  border: 1px solid var(--card-border);
   border-radius: 16px;
   padding: 1.4rem;
   max-height: 78vh;
@@ -1130,7 +1133,8 @@ body {
   flex-direction: column;
   backdrop-filter: blur(24px) saturate(1.5);
   -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  box-shadow: 0 40px 80px -30px rgba(20, 25, 35, 0.45);
+  box-shadow: var(--card-shadow);
+  color: var(--text);
 }
 
 .modal-head {
@@ -1178,87 +1182,16 @@ body {
    navigation rows, distinct from .season-row's checkbox-select rows in the
    request modal's season picker. */
 .browse-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.6rem 0; cursor: pointer; }
-.browse-row + .browse-row { border-top: 1px solid rgba(20,25,35,0.08); }
+.browse-row + .browse-row { border-top: 1px solid var(--input-border); }
 .browse-row:hover { opacity: 0.85; }
-.browse-row-thumb { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; background: #E2E6EC; flex-shrink: 0; }
-.browse-row-name { font-size: 0.85rem; font-weight: 600; }
+.browse-row-thumb { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; background: var(--input-bg); flex-shrink: 0; }
+.browse-row-name { font-size: 0.85rem; font-weight: 600; color: var(--text); }
 .browse-row-index { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); }
 
 #search-input, #report-search-input, #library-search-input {
-  width: 100%; padding: 0.75rem 0.95rem; background: rgba(255,255,255,0.7);
-  border: 1px solid rgba(20,25,35,0.1); border-radius: 9px; color: var(--text);
+  width: 100%; padding: 0.75rem 0.95rem; background: var(--input-bg);
+  border: 1px solid var(--input-border); border-radius: 9px; color: var(--text);
   font-family: var(--body); font-size: 0.9rem; margin-bottom: 0.85rem;
-}
-
-.browse-row+.browse-row {
-  border-top: 1px solid rgba(20, 25, 35, 0.08);
-}
-
-.browse-row:hover {
-  opacity: 0.85;
-}
-
-.browse-row-thumb {
-  width: 42px;
-  height: 42px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: #E2E6EC;
-  flex-shrink: 0;
-}
-
-.browse-row-name {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.browse-row-index {
-  font-size: 0.75rem;
-  color: var(--muted);
-  font-family: var(--mono);
-}
-
-#search-input,
-#report-search-input {
-  width: 100%;
-  padding: 0.75rem 0.95rem;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(20, 25, 35, 0.1);
-  border-radius: 99px;
-  color: var(--text);
-  font-family: var(--body);
-  font-size: 0.9rem;
-  margin-bottom: 0.85rem;
-}
-
-#search-input:focus,
-#report-search-input:focus {
-  outline: none;
-  border-color: var(--teal);
-}
-
-.discover-label {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: -0.35rem 0 0.5rem;
-}
-
-.search-results {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.my-requests-list {
-  flex: 1;
-  overflow-y: auto;
-}
-
-#mystats-body {
-  flex: 1;
-  overflow-y: auto;
 }
 
 .my-request-row {
@@ -1269,7 +1202,7 @@ body {
 }
 
 .my-request-row+.my-request-row {
-  border-top: 1px solid rgba(20, 25, 35, 0.08);
+  border-top: 1px solid var(--input-border);
 }
 
 .my-request-status {
@@ -1311,7 +1244,7 @@ body {
 }
 
 .result-item+.result-item {
-  border-top: 1px solid rgba(20, 25, 35, 0.08);
+  border-top: 1px solid var(--input-border);
 }
 
 .result-poster {
@@ -1319,7 +1252,7 @@ body {
   height: 60px;
   object-fit: cover;
   border-radius: 6px;
-  background: #E2E6EC;
+  background: var(--input-bg);
 }
 
 .result-info {
@@ -1329,6 +1262,7 @@ body {
 .result-title {
   font-size: 0.87rem;
   font-weight: 600;
+  color: var(--text);
 }
 
 .result-year {
@@ -1349,6 +1283,7 @@ body {
   font-family: var(--display);
   margin: 0 0 0.75rem;
   font-weight: 600;
+  color: var(--text);
 }
 
 .season-list {
@@ -1363,10 +1298,11 @@ body {
   gap: 0.7rem;
   padding: 0.55rem 0;
   font-size: 0.85rem;
+  color: var(--text);
 }
 
 .season-row+.season-row {
-  border-top: 1px solid rgba(20, 25, 35, 0.08);
+  border-top: 1px solid var(--input-border);
 }
 
 .season-row input[type="checkbox"] {
@@ -1400,14 +1336,14 @@ body {
 .info-card { width: min(620px, 92vw); padding: 0; overflow: hidden; position: relative; }
 .info-close { position: absolute; top: 0.85rem; right: 0.85rem; z-index: 2; }
 .info-layout { display: flex; gap: 1.5rem; padding: 1.5rem; max-height: 78vh; overflow-y: auto; }
-.info-poster { width: 150px; flex-shrink: 0; border-radius: 12px; object-fit: cover; aspect-ratio: 2/3; background: #E2E6EC; box-shadow: 0 16px 32px -14px rgba(20,25,35,0.4); }
+.info-poster { width: 150px; flex-shrink: 0; border-radius: 12px; object-fit: cover; aspect-ratio: 2/3; background: var(--input-bg); box-shadow: 0 16px 32px -14px rgba(0,0,0,0.4); }
 /* Reserves permanent clearance under .info-close (absolutely positioned over
    the top-right corner) so the CH.NN badge (first thing in the body) never
    sits underneath it. */
 .info-body { min-width: 0; padding-right: 1.75rem; }
-.info-body h3 { font-family: var(--display); font-size: 1.3rem; font-weight: 600; margin: 0.6rem 0 0.3rem; }
+.info-body h3 { font-family: var(--display); font-size: 1.3rem; font-weight: 600; margin: 0.6rem 0 0.3rem; color: var(--text); }
 .info-meta { color: var(--muted); font-family: var(--mono); font-size: 0.78rem; margin: 0 0 0.85rem; }
-.info-overview { font-size: 0.9rem; line-height: 1.55; color: #2b3140; margin: 0; }
+.info-overview { font-size: 0.9rem; line-height: 1.55; color: var(--text); margin: 0; }
 
 /* On a real phone width, the 150px poster + gap left too little room for the
    text column even with the padding-right reservation above — the CH.NN
@@ -1726,8 +1662,8 @@ body {
 .notice-preset-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
 .notice-preset-row-fun { opacity: 0.75; }
 .settings-input-full {
-  width: 100%; padding: 0.6rem 0.75rem; background: rgba(255,255,255,0.7);
-  border: 1px solid rgba(20,25,35,0.1); border-radius: 8px; color: var(--text);
+  width: 100%; padding: 0.6rem 0.75rem; background: var(--input-bg);
+  border: 1px solid var(--input-border); border-radius: 8px; color: var(--text);
   font-family: var(--mono); font-size: 0.85rem;
 }
 .settings-input-full:focus { outline: none; border-color: var(--teal); }
@@ -1747,13 +1683,13 @@ body {
 /* Confirm dialog — replaces the browser's native confirm() so it matches the
    rest of the app instead of a plain unstyled OS dialog. */
 .confirm-card { width: min(380px, 90vw); }
-#confirm-message { font-size: 0.92rem; line-height: 1.5; margin: 0 0 1rem; }
+#confirm-message { font-size: 0.92rem; line-height: 1.5; margin: 0 0 1rem; color: var(--text); }
 
 /* Toggle switch for true/false values */
 .settings-toggle { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
 .settings-toggle input { opacity: 0; width: 0; height: 0; }
 .settings-toggle-slider {
-  position: absolute; inset: 0; background: rgba(20,25,35,0.15); border-radius: 22px;
+  position: absolute; inset: 0; background: var(--input-border); border-radius: 22px;
   transition: background 0.15s ease; cursor: pointer;
 }
 .settings-toggle-slider::before {
