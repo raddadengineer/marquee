@@ -10,6 +10,7 @@ const tautulliMedia = require('../lib/tautulliMedia');
 const { adminClient, mapDiscoverItem } = require('../lib/overseerrClient');
 const downloadQueueIds = require('../lib/downloadQueueIds');
 const { computeAvailability } = require('../lib/requestAvailability');
+const { isConfigured } = require('../lib/services');
 const router = express.Router();
 
 router.use((req, res, next) => {

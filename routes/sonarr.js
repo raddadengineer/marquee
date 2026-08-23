@@ -4,6 +4,7 @@ const requireAuth = require('./requireAuth');
 const requireOwner = require('./requireOwner');
 const { mapReleases } = require('../lib/releaseSearch');
 const { mapFileInfo } = require('../lib/fileInfo');
+const { isConfigured } = require('../lib/services');
 const router = express.Router();
 
 router.use((req, res, next) => {

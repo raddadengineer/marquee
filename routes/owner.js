@@ -8,6 +8,7 @@ const ups = require('../lib/ups');
 const loginLog = require('../lib/loginLog');
 const { shortestLabelRows } = require('../lib/diskspace');
 const { annotateAndSort } = require('../lib/stuckRequests');
+const { isConfigured } = require('../lib/services');
 const router = express.Router();
 
 const fs = require('fs');
