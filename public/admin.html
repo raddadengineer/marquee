@@ -280,10 +280,20 @@
         <label class="settings-field-block-label">Technical &amp; Transcode Details</label>
         <select id="privacy-stream-tech-input" class="settings-input-full">
           <option value="full_technical">Full Transcode &amp; Device Details</option>
+          <option value="custom">Custom Granular Toggles Below</option>
           <option value="hide_network_ip">Hide IP Addresses &amp; Locations</option>
           <option value="hide_device_info">Hide Player Hardware &amp; Apps</option>
           <option value="hide_all_transcode">Hide Transcode Decisions &amp; Bitrates</option>
         </select>
+        <div class="privacy-panel-grid" style="margin-top: 0.6rem;">
+          <label class="privacy-toggle-label"><input type="checkbox" id="tech-show-ip" checked> IP &amp; Location</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="tech-show-device" checked> Hardware &amp; Player App</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="tech-show-transcode" checked> Direct Play vs Transcode</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="tech-show-codecs" checked> Audio/Video Codecs</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="tech-show-bitrate" checked> Stream Bitrate</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="tech-show-resolution" checked> Video Resolution</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="tech-show-reason" checked> Transcode Reason</label>
+        </div>
       </div>
 
       <div class="settings-field-block">

@@ -1083,6 +1083,15 @@ async function loadPrivacySettings() {
       document.getElementById('privacy-custom-label-input').value = privacy.PRIVACY_CUSTOM_USER_LABEL || 'Family Member';
       document.getElementById('privacy-stream-media-input').value = privacy.PRIVACY_STREAM_MEDIA_CONTENT || 'full_details';
       document.getElementById('privacy-stream-tech-input').value = privacy.PRIVACY_STREAM_TECHNICAL || 'full_technical';
+
+      if (document.getElementById('tech-show-ip')) document.getElementById('tech-show-ip').checked = privacy.PRIVACY_TECH_SHOW_IP !== 'false';
+      if (document.getElementById('tech-show-device')) document.getElementById('tech-show-device').checked = privacy.PRIVACY_TECH_SHOW_DEVICE !== 'false';
+      if (document.getElementById('tech-show-transcode')) document.getElementById('tech-show-transcode').checked = privacy.PRIVACY_TECH_SHOW_TRANSCODE !== 'false';
+      if (document.getElementById('tech-show-codecs')) document.getElementById('tech-show-codecs').checked = privacy.PRIVACY_TECH_SHOW_CODECS !== 'false';
+      if (document.getElementById('tech-show-bitrate')) document.getElementById('tech-show-bitrate').checked = privacy.PRIVACY_TECH_SHOW_BITRATE !== 'false';
+      if (document.getElementById('tech-show-resolution')) document.getElementById('tech-show-resolution').checked = privacy.PRIVACY_TECH_SHOW_RESOLUTION !== 'false';
+      if (document.getElementById('tech-show-reason')) document.getElementById('tech-show-reason').checked = privacy.PRIVACY_TECH_SHOW_REASON !== 'false';
+
       document.getElementById('privacy-allow-self-view-input').checked = privacy.PRIVACY_STREAM_ALLOW_SELF_VIEW !== 'false';
       document.getElementById('privacy-own-only-input').checked = privacy.PRIVACY_STREAM_OWN_ONLY === 'true';
       document.getElementById('privacy-metrics-input').value = privacy.PRIVACY_SYSTEM_METRICS || 'full_paths';
@@ -1108,6 +1117,10 @@ document.getElementById('privacy-preset-strict')?.addEventListener('click', () =
   document.getElementById('privacy-custom-label-input').value = 'Guest';
   document.getElementById('privacy-stream-media-input').value = 'category_only';
   document.getElementById('privacy-stream-tech-input').value = 'hide_all_transcode';
+  ['tech-show-ip','tech-show-device','tech-show-transcode','tech-show-codecs','tech-show-bitrate','tech-show-resolution','tech-show-reason'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = false;
+  });
   document.getElementById('privacy-allow-self-view-input').checked = false;
   document.getElementById('privacy-own-only-input').checked = true;
   document.getElementById('privacy-metrics-input').value = 'percent_only';
@@ -1121,6 +1134,13 @@ document.getElementById('privacy-preset-family')?.addEventListener('click', () =
   document.getElementById('privacy-custom-label-input').value = 'Family Member';
   document.getElementById('privacy-stream-media-input').value = 'show_name_only';
   document.getElementById('privacy-stream-tech-input').value = 'hide_network_ip';
+  document.getElementById('tech-show-ip').checked = false;
+  document.getElementById('tech-show-device').checked = true;
+  document.getElementById('tech-show-transcode').checked = true;
+  document.getElementById('tech-show-codecs').checked = true;
+  document.getElementById('tech-show-bitrate').checked = true;
+  document.getElementById('tech-show-resolution').checked = true;
+  document.getElementById('tech-show-reason').checked = true;
   document.getElementById('privacy-allow-self-view-input').checked = true;
   document.getElementById('privacy-own-only-input').checked = false;
   document.getElementById('privacy-metrics-input').value = 'mask_paths';
@@ -1134,6 +1154,10 @@ document.getElementById('privacy-preset-full')?.addEventListener('click', () => 
   document.getElementById('privacy-custom-label-input').value = 'Family Member';
   document.getElementById('privacy-stream-media-input').value = 'full_details';
   document.getElementById('privacy-stream-tech-input').value = 'full_technical';
+  ['tech-show-ip','tech-show-device','tech-show-transcode','tech-show-codecs','tech-show-bitrate','tech-show-resolution','tech-show-reason'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = true;
+  });
   document.getElementById('privacy-allow-self-view-input').checked = true;
   document.getElementById('privacy-own-only-input').checked = false;
   document.getElementById('privacy-metrics-input').value = 'full_paths';
@@ -1157,6 +1181,13 @@ document.getElementById('privacy-save-btn')?.addEventListener('click', async () 
     PRIVACY_CUSTOM_USER_LABEL: document.getElementById('privacy-custom-label-input').value.trim() || 'Family Member',
     PRIVACY_STREAM_MEDIA_CONTENT: document.getElementById('privacy-stream-media-input').value,
     PRIVACY_STREAM_TECHNICAL: document.getElementById('privacy-stream-tech-input').value,
+    PRIVACY_TECH_SHOW_IP: document.getElementById('tech-show-ip').checked ? 'true' : 'false',
+    PRIVACY_TECH_SHOW_DEVICE: document.getElementById('tech-show-device').checked ? 'true' : 'false',
+    PRIVACY_TECH_SHOW_TRANSCODE: document.getElementById('tech-show-transcode').checked ? 'true' : 'false',
+    PRIVACY_TECH_SHOW_CODECS: document.getElementById('tech-show-codecs').checked ? 'true' : 'false',
+    PRIVACY_TECH_SHOW_BITRATE: document.getElementById('tech-show-bitrate').checked ? 'true' : 'false',
+    PRIVACY_TECH_SHOW_RESOLUTION: document.getElementById('tech-show-resolution').checked ? 'true' : 'false',
+    PRIVACY_TECH_SHOW_REASON: document.getElementById('tech-show-reason').checked ? 'true' : 'false',
     PRIVACY_STREAM_ALLOW_SELF_VIEW: document.getElementById('privacy-allow-self-view-input').checked ? 'true' : 'false',
     PRIVACY_STREAM_OWN_ONLY: document.getElementById('privacy-own-only-input').checked ? 'true' : 'false',
     PRIVACY_SYSTEM_METRICS: document.getElementById('privacy-metrics-input').value,
