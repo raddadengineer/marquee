@@ -21,6 +21,23 @@
 (function() {
   var t = localStorage.getItem('marquee-theme') || 'marquee-light';
   document.documentElement.setAttribute('data-theme', t);
+  if (t === 'custom') {
+    try {
+      var c = JSON.parse(localStorage.getItem('marquee-custom-colors') || '{}');
+      var r = document.documentElement;
+      if (c.bg) r.style.setProperty('--custom-bg', c.bg);
+      if (c.card) r.style.setProperty('--custom-card', c.card);
+      if (c.text) r.style.setProperty('--custom-text', c.text);
+      if (c.accent) {
+        r.style.setProperty('--custom-accent', c.accent);
+        r.style.setProperty('--custom-accent-transparent', c.accent + '40');
+      }
+      if (c.secondary) {
+        r.style.setProperty('--custom-secondary', c.secondary);
+        r.style.setProperty('--custom-sec-transparent', c.secondary + '40');
+      }
+    } catch (e) {}
+  }
 })();
 </script>
 <script>window.SITE_TAGLINES = {{TAGLINES_JSON}};</script>

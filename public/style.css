@@ -116,6 +116,29 @@
   --modal-card: #1A1412;
 }
 
+[data-theme="custom"] {
+  --bg: var(--custom-bg, #0F172A);
+  --bg-gradient:
+    radial-gradient(circle at 15% 15%, var(--custom-accent-transparent, rgba(56, 189, 248, 0.25)), transparent 45%),
+    radial-gradient(circle at 85% 85%, var(--custom-sec-transparent, rgba(244, 63, 94, 0.25)), transparent 45%),
+    var(--bg);
+  --card: var(--custom-card, rgba(30, 41, 59, 0.82));
+  --card-border: var(--custom-border, rgba(255, 255, 255, 0.18));
+  --card-shadow: 0 16px 36px -22px rgba(0, 0, 0, 0.5);
+  --text: var(--custom-text, #F8FAFC);
+  --muted: var(--custom-muted, #94A3B8);
+  --teal: var(--custom-accent, #38BDF8);
+  --amber: var(--custom-secondary, #F43F5E);
+  --danger: #F87171;
+  --gold: #FBBF24;
+  --silver: #CBD5E1;
+  --bronze: #E2E8F0;
+  --input-bg: var(--custom-input-bg, rgba(15, 23, 42, 0.9));
+  --input-border: var(--custom-border, rgba(255, 255, 255, 0.18));
+  --modal-bg: rgba(0, 0, 0, 0.8);
+  --modal-card: var(--custom-card, #1E293B);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1806,4 +1829,82 @@ body {
   color: var(--muted);
   font-family: var(--mono);
 }
+
+/* Custom Theme Color Picker Controls */
+.custom-theme-panel {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--input-border);
+}
+
+.custom-color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.custom-color-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.custom-color-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.custom-color-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+}
+
+.custom-color-input {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.custom-color-hex {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+.custom-presets-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.preset-chip {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 20px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.preset-chip:hover {
+  border-color: var(--teal);
+  background: rgba(15, 143, 118, 0.1);
+}
+
 
