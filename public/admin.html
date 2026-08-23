@@ -182,6 +182,7 @@
       <button id="tab-settings-status-btn" class="modal-tab pill-btn"><span class="state-dot"></span>System Status</button>
       <button id="tab-settings-signins-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Recent Sign-ins</button>
       <button id="tab-settings-notice-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Notice Board</button>
+      <button id="tab-settings-privacy-btn" class="modal-tab pill-btn"><span class="state-dot"></span>Privacy &amp; Security</button>
     </div>
 
     <div id="settings-services-tab" class="settings-body">
@@ -237,6 +238,70 @@
         <button id="notice-save-btn" class="btn-primary">Post Notice</button>
       </div>
       <p id="notice-save-status" class="settings-status hidden"></p>
+    </div>
+
+    <div id="settings-privacy-tab" class="settings-body hidden">
+      <div class="settings-section-row">
+        <h4 class="admin-subhead">Privacy &amp; Security Presets</h4>
+      </div>
+      <div class="notice-preset-row">
+        <button type="button" class="pill-btn" id="privacy-preset-strict">🛡️ Strict Privacy</button>
+        <button type="button" class="pill-btn" id="privacy-preset-family">🏠 Family &amp; Friends</button>
+        <button type="button" class="pill-btn" id="privacy-preset-full">🔓 Full Open</button>
+      </div>
+
+      <div class="settings-field-block" style="margin-top: 1rem;">
+        <label class="settings-field-block-label">Stream User Identity</label>
+        <select id="privacy-stream-user-input" class="settings-input-full">
+          <option value="full">Full Usernames &amp; Avatars</option>
+          <option value="mask_usernames">Mask Usernames (User ***)</option>
+          <option value="generic_labels">Generic Labels (Family Member / Guest)</option>
+          <option value="hide_identity">Hide User Names &amp; Avatars Completely</option>
+        </select>
+      </div>
+
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Stream Media Titles &amp; Artwork</label>
+        <select id="privacy-stream-media-input" class="settings-input-full">
+          <option value="full_details">Full Titles &amp; Artwork</option>
+          <option value="show_name_only">Show TV Series Name Only</option>
+          <option value="category_only">Category Only (Watching Movie / TV Show)</option>
+          <option value="blur_artwork">Blur Poster Artwork</option>
+        </select>
+      </div>
+
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Technical &amp; Transcode Details</label>
+        <select id="privacy-stream-tech-input" class="settings-input-full">
+          <option value="full_technical">Full Transcode &amp; Device Details</option>
+          <option value="hide_network_ip">Hide IP Addresses &amp; Locations</option>
+          <option value="hide_device_info">Hide Player Hardware &amp; Apps</option>
+          <option value="hide_all_transcode">Hide Transcode Decisions &amp; Bitrates</option>
+        </select>
+      </div>
+
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Storage &amp; Volume Metrics</label>
+        <select id="privacy-metrics-input" class="settings-input-full">
+          <option value="full_paths">Full Drive Paths &amp; Capacity</option>
+          <option value="mask_paths">Mask Paths (Volume 1, Volume 2)</option>
+          <option value="percent_only">Show Percentage Used Gauges Only</option>
+        </select>
+      </div>
+
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Leaderboards &amp; User Stats</label>
+        <select id="privacy-stats-input" class="settings-input-full">
+          <option value="full_leaderboard">Full Leaderboard &amp; Top Viewers</option>
+          <option value="anonymous_leaderboard">Anonymous Leaderboard (User #1, User #2)</option>
+          <option value="disable_leaderboard">Disable Leaderboard for Non-Admins</option>
+        </select>
+      </div>
+
+      <div class="settings-edit-actions" style="margin-top: 1.2rem;">
+        <button id="privacy-save-btn" class="btn-primary">Save Privacy Settings</button>
+      </div>
+      <p id="privacy-save-status" class="settings-status hidden"></p>
     </div>
   </div>
 </div>

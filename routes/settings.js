@@ -80,6 +80,35 @@ router.get('/deployment', requireAuth, requireOwner, (req, res) => {
   res.json(fields.map(f => toClientField({ key: f.key, label: f.key, description: f.description, value: f.value })));
 });
 
+const PRIVACY_KEYS = new Set([
+  'PRIVACY_STREAM_USER_IDENTITY',
+  'PRIVACY_STREAM_MEDIA_CONTENT',
+  'PRIVACY_STREAM_TECHNICAL',
+  'PRIVACY_STREAM_ALLOW_SELF_VIEW',
+  'PRIVACY_STREAM_OWN_ONLY',
+  'PRIVACY_SYSTEM_METRICS',
+  'PRIVACY_HIDE_SYSTEM_VERSIONS',
+  'PRIVACY_STATS',
+  'PRIVACY_HIDE_REQUESTER',
+  'PRIVACY_MY_REQUESTS_ONLY',
+  'VISIBILITY_NOW_PLAYING',
+  'VISIBILITY_TOP_WATCHED',
+  'VISIBILITY_STORAGE',
+  'VISIBILITY_GRAB_STATUS',
+  'VISIBILITY_RECENTLY_ADDED',
+  'VISIBILITY_AIRING_TODAY',
+  'VISIBILITY_UPCOMING'
+]);
+
+router.get('/privacy', requireAuth, requireOwner, (req, res) => {
+  const values = currentValues() || new Map();
+  const privacy = {};
+  for (const k of PRIVACY_KEYS) {
+    privacy[k] = values.get(k) || process.env[k] || '';
+  }
+  res.json(privacy);
+});
+
 router.post('/', requireAuth, requireOwner, (req, res) => {
   const { changes } = req.body;
   if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
@@ -90,14 +119,8 @@ router.post('/', requireAuth, requireOwner, (req, res) => {
   }
 
   const text = fs.readFileSync(ENV_PATH, 'utf8');
-  // A key can be written here if it's either already a line in .env, or one
-  // of the fields SERVICES declares as valid — the latter matters when a
-  // service registry field is being set for the first time on a deployment
-  // whose .env predates that field being added (e.g. QBITTORRENT_API_KEY on
-  // a .env that only ever had USERNAME/PASSWORD). Either way this is still
-  // a fixed, developer-controlled set, never arbitrary client-supplied keys.
   const knownKeys = new Set(parseFields(text).map(f => f.key));
-  const allowedKeys = new Set([...knownKeys, ...SERVICE_KEYS]);
+  const allowedKeys = new Set([...knownKeys, ...SERVICE_KEYS, ...PRIVACY_KEYS]);
 
   const updates = {};
   for (const [key, value] of Object.entries(changes)) {

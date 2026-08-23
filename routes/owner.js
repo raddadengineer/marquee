@@ -9,6 +9,7 @@ const loginLog = require('../lib/loginLog');
 const { shortestLabelRows } = require('../lib/diskspace');
 const { annotateAndSort } = require('../lib/stuckRequests');
 const { isConfigured } = require('../lib/services');
+const { sanitizeDiskspace, getPrivacyConfigFromEnv } = require('../lib/privacy');
 const router = express.Router();
 
 const fs = require('fs');
@@ -95,7 +96,7 @@ router.get('/wanted', requireAuth, requireOwner, async (req, res) => {
 // sees — confirmed live that this setup has them sharing several (/,
 // /config, /downloads/completed all report identical byte counts from
 // both services, since they're the same underlying host volumes).
-router.get('/diskspace', requireAuth, requireOwner, async (req, res) => {
+router.get('/diskspace', requireAuth, async (req, res) => {
   const [radarr, sonarr] = await Promise.all([
     settle('radarr diskspace', axios.get(`${process.env.RADARR_URL}/api/v3/diskspace`, {
       headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
@@ -109,7 +110,9 @@ router.get('/diskspace', requireAuth, requireOwner, async (req, res) => {
     totalBytes: d.totalSpace,
     freeBytes: d.freeSpace
   }));
-  res.json(shortestLabelRows(volumes));
+  const rows = shortestLabelRows(volumes);
+  const privacyConf = getPrivacyConfigFromEnv();
+  res.json(sanitizeDiskspace(rows, req.user, privacyConf));
 });
 
 module.exports = router;

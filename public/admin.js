@@ -1039,10 +1039,12 @@ const settingsTabs = [
   { btn: document.getElementById('tab-settings-services-btn'), pane: document.getElementById('settings-services-tab') },
   { btn: document.getElementById('tab-settings-status-btn'), pane: document.getElementById('settings-status-tab') },
   { btn: document.getElementById('tab-settings-signins-btn'), pane: document.getElementById('settings-signins-tab') },
-  { btn: document.getElementById('tab-settings-notice-btn'), pane: document.getElementById('settings-notice-tab') }
+  { btn: document.getElementById('tab-settings-notice-btn'), pane: document.getElementById('settings-notice-tab') },
+  { btn: document.getElementById('tab-settings-privacy-btn'), pane: document.getElementById('settings-privacy-tab') }
 ];
 function activateSettingsTab(btn) {
   for (const t of settingsTabs) {
+    if (!t.btn || !t.pane) continue;
     const isActive = t.btn === btn;
     t.btn.classList.toggle('active', isActive);
     t.pane.classList.toggle('hidden', !isActive);
@@ -1051,19 +1053,89 @@ function activateSettingsTab(btn) {
 let ownerStatusLoaded = false;
 let adminLoginsLoaded = false;
 let noticeSettingsLoaded = false;
+let privacySettingsLoaded = false;
 
-settingsTabs[0].btn.addEventListener('click', () => activateSettingsTab(settingsTabs[0].btn));
-settingsTabs[1].btn.addEventListener('click', () => {
+settingsTabs[0].btn?.addEventListener('click', () => activateSettingsTab(settingsTabs[0].btn));
+settingsTabs[1].btn?.addEventListener('click', () => {
   activateSettingsTab(settingsTabs[1].btn);
   if (!ownerStatusLoaded) { ownerStatusLoaded = true; loadOwnerStatus(); }
 });
-settingsTabs[2].btn.addEventListener('click', () => {
+settingsTabs[2].btn?.addEventListener('click', () => {
   activateSettingsTab(settingsTabs[2].btn);
   if (!adminLoginsLoaded) { adminLoginsLoaded = true; loadAdminLogins(); }
 });
-settingsTabs[3].btn.addEventListener('click', () => {
+settingsTabs[3].btn?.addEventListener('click', () => {
   activateSettingsTab(settingsTabs[3].btn);
   if (!noticeSettingsLoaded) { noticeSettingsLoaded = true; loadNoticeSettings(); }
+});
+settingsTabs[4].btn?.addEventListener('click', () => {
+  activateSettingsTab(settingsTabs[4].btn);
+  if (!privacySettingsLoaded) { privacySettingsLoaded = true; loadPrivacySettings(); }
+});
+
+async function loadPrivacySettings() {
+  const status = document.getElementById('privacy-save-status');
+  if (status) status.classList.add('hidden');
+  try {
+    const privacy = await api('/api/settings/privacy');
+    if (document.getElementById('privacy-stream-user-input')) {
+      document.getElementById('privacy-stream-user-input').value = privacy.PRIVACY_STREAM_USER_IDENTITY || 'full';
+      document.getElementById('privacy-stream-media-input').value = privacy.PRIVACY_STREAM_MEDIA_CONTENT || 'full_details';
+      document.getElementById('privacy-stream-tech-input').value = privacy.PRIVACY_STREAM_TECHNICAL || 'full_technical';
+      document.getElementById('privacy-metrics-input').value = privacy.PRIVACY_SYSTEM_METRICS || 'full_paths';
+      document.getElementById('privacy-stats-input').value = privacy.PRIVACY_STATS || 'full_leaderboard';
+    }
+  } catch (e) {
+    console.error('Failed to load privacy settings', e);
+  }
+}
+
+document.getElementById('privacy-preset-strict')?.addEventListener('click', () => {
+  document.getElementById('privacy-stream-user-input').value = 'mask_usernames';
+  document.getElementById('privacy-stream-media-input').value = 'category_only';
+  document.getElementById('privacy-stream-tech-input').value = 'hide_all_transcode';
+  document.getElementById('privacy-metrics-input').value = 'percent_only';
+  document.getElementById('privacy-stats-input').value = 'disable_leaderboard';
+});
+
+document.getElementById('privacy-preset-family')?.addEventListener('click', () => {
+  document.getElementById('privacy-stream-user-input').value = 'generic_labels';
+  document.getElementById('privacy-stream-media-input').value = 'show_name_only';
+  document.getElementById('privacy-stream-tech-input').value = 'hide_network_ip';
+  document.getElementById('privacy-metrics-input').value = 'mask_paths';
+  document.getElementById('privacy-stats-input').value = 'anonymous_leaderboard';
+});
+
+document.getElementById('privacy-preset-full')?.addEventListener('click', () => {
+  document.getElementById('privacy-stream-user-input').value = 'full';
+  document.getElementById('privacy-stream-media-input').value = 'full_details';
+  document.getElementById('privacy-stream-tech-input').value = 'full_technical';
+  document.getElementById('privacy-metrics-input').value = 'full_paths';
+  document.getElementById('privacy-stats-input').value = 'full_leaderboard';
+});
+
+document.getElementById('privacy-save-btn')?.addEventListener('click', async () => {
+  const statusEl = document.getElementById('privacy-save-status');
+  statusEl.className = 'settings-status';
+  statusEl.textContent = 'Saving privacy settings…';
+  statusEl.classList.remove('hidden');
+
+  const changes = {
+    PRIVACY_STREAM_USER_IDENTITY: document.getElementById('privacy-stream-user-input').value,
+    PRIVACY_STREAM_MEDIA_CONTENT: document.getElementById('privacy-stream-media-input').value,
+    PRIVACY_STREAM_TECHNICAL: document.getElementById('privacy-stream-tech-input').value,
+    PRIVACY_SYSTEM_METRICS: document.getElementById('privacy-metrics-input').value,
+    PRIVACY_STATS: document.getElementById('privacy-stats-input').value
+  };
+
+  try {
+    await api('/api/settings', { method: 'POST', body: JSON.stringify({ changes }) });
+    statusEl.className = 'settings-status ok';
+    statusEl.textContent = 'Privacy settings saved! Restarting container to apply…';
+  } catch (err) {
+    statusEl.className = 'settings-status error';
+    statusEl.textContent = err.message || 'Could not save privacy settings.';
+  }
 });
 
 async function openSettings() {

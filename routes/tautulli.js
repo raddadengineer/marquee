@@ -5,6 +5,7 @@ const nowPlaying = require('../lib/nowPlaying');
 const { imageUrl } = require('../lib/plexImage');
 const { isConfigured } = require('../lib/services');
 const { computeStreak, computeTopWatched, computeRank, parseActivitySeries } = require('../lib/myStats');
+const { sanitizeSession, sanitizeLeaderboard, getPrivacyConfigFromEnv } = require('../lib/privacy');
 const router = express.Router();
 
 router.use((req, res, next) => {
@@ -37,7 +38,10 @@ router.get('/libraries', requireAuth, async (req, res) => {
 // hitting Tautulli directly — it's kept fresh by Plex's own push notifications,
 // so this is both instant and just as current.
 router.get('/now-playing', requireAuth, (req, res) => {
-  res.json(nowPlaying.getSnapshot());
+  const snapshot = nowPlaying.getSnapshot();
+  const config = getPrivacyConfigFromEnv();
+  const sessions = (snapshot.sessions || []).map(s => sanitizeSession(s, req.user, config)).filter(Boolean);
+  res.json({ ...snapshot, sessions });
 });
 
 // Live updates: an initial "full" event on connect, then "full" (session added/
@@ -278,10 +282,17 @@ router.get('/top-of-month', requireAuth, async (req, res) => {
     const [mainRes] = await Promise.all([fetchStats(null, 30)]);
     const rowsFor = (payload, statId) => (payload.data?.response?.data || []).find(s => s.stat_id === statId)?.rows || [];
 
-    const topUsers = rowsFor(mainRes, 'top_users').slice(0, 3).map(u => ({
-      name: u.friendly_name || u.user,
+    const privacyConf = getPrivacyConfigFromEnv();
+    const rawTopUsers = rowsFor(mainRes, 'top_users').slice(0, 3).map(u => ({
+      username: u.friendly_name || u.user,
       plays: u.total_plays,
-      avatar: u.user_thumb || null
+      thumb: u.user_thumb || null
+    }));
+    const sanitizedUsers = sanitizeLeaderboard(rawTopUsers, req.user, privacyConf);
+    const topUsers = sanitizedUsers.map(u => ({
+      name: u.username,
+      plays: u.plays,
+      avatar: u.thumb
     }));
 
     const config = parseLibraryConfig();
