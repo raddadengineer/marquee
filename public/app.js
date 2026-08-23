@@ -1525,3 +1525,49 @@ document.getElementById('upcoming-body').addEventListener('click', e => {
   });
 });
 
+// ---------- Theme System Modal Logic ----------
+const themeModal = document.getElementById('theme-modal');
+const themeGrid = document.getElementById('theme-options-grid');
+const themeBtn = document.getElementById('theme-btn');
+const closeThemeModalBtn = document.getElementById('close-theme-modal-btn');
+
+function renderThemePicker() {
+  if (!themeGrid) return;
+  const current = getTheme();
+  themeGrid.innerHTML = MARQUEE_THEMES.map(t => `
+    <div class="theme-card ${t.id === current ? 'active' : ''}" data-theme-id="${t.id}">
+      <div class="theme-card-head">
+        <span class="theme-card-title">${escapeHtml(t.name)}</span>
+        <div class="theme-swatches">
+          <span class="theme-swatch" style="background:${t.primary};"></span>
+          <span class="theme-swatch" style="background:${t.card};"></span>
+          <span class="theme-swatch" style="background:${t.accent};"></span>
+        </div>
+      </div>
+      <div class="theme-card-desc">${escapeHtml(t.desc)}</div>
+    </div>
+  `).join('');
+}
+
+if (themeBtn && themeModal) {
+  themeBtn.addEventListener('click', () => {
+    renderThemePicker();
+    themeModal.classList.remove('hidden');
+  });
+  if (closeThemeModalBtn) {
+    closeThemeModalBtn.addEventListener('click', () => themeModal.classList.add('hidden'));
+  }
+  if (themeGrid) {
+    themeGrid.addEventListener('click', e => {
+      const card = e.target.closest('.theme-card');
+      if (!card) return;
+      const id = card.dataset.themeId;
+      if (id) {
+        setTheme(id);
+        renderThemePicker();
+      }
+    });
+  }
+}
+
+

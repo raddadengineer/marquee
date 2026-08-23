@@ -17,6 +17,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="{{SITE_NAME}}">
 
+<script>
+(function() {
+  var t = localStorage.getItem('marquee-theme') || 'marquee-light';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
 <script>window.SITE_TAGLINES = {{TAGLINES_JSON}};</script>
 </head>
 <body>
@@ -49,6 +55,7 @@
           <div class="logo-tag" id="header-tag"></div>
         </div>
         <div class="hero-icons">
+          <button id="theme-btn" class="icon-btn" aria-label="Theme System" title="Theme System">&#127912;</button>
           <button id="admin-settings-btn" class="icon-btn hidden" aria-label="Admin & Settings" title="Admin & Settings">&#9881;</button>
           <button id="search-btn" class="icon-btn" aria-label="Request something">+</button>
           <button id="report-search-btn" class="icon-btn" aria-label="Report an issue">&#9873;</button>
@@ -268,6 +275,18 @@
       <dl id="torrent-details-stats" class="info-stream"></dl>
       <div id="torrent-details-files" class="torrent-files"></div>
     </div>
+  </div>
+</div>
+
+<!-- THEME PICKER MODAL -->
+<div id="theme-modal" class="modal hidden">
+  <div class="modal-card theme-modal-card">
+    <div class="modal-head">
+      <div class="modal-title">Theme System</div>
+      <button id="close-theme-modal-btn" class="pill-btn pill-btn-icon" aria-label="Close">&#215;</button>
+    </div>
+    <div class="discover-label" style="margin-top: 0.5rem;">Select your preferred visual style</div>
+    <div class="theme-grid" id="theme-options-grid"></div>
   </div>
 </div>
 
