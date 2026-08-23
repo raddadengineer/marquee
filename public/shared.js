@@ -168,4 +168,168 @@ function setTheme(themeId) {
   return target;
 }
 
+const PRESET_PALETTES = [
+  { name: 'Deep Neon', bg: '#0F172A', card: '#1E293B', text: '#F8FAFC', accent: '#38BDF8', secondary: '#F43F5E' },
+  { name: 'Emerald Forest', bg: '#064E3B', card: '#047857', text: '#ECFDF5', accent: '#34D399', secondary: '#F59E0B' },
+  { name: 'Rose Quartz', bg: '#4C1D95', card: '#5B21B6', text: '#F5F3FF', accent: '#F472B6', secondary: '#38BDF8' },
+  { name: 'Cyber Gold', bg: '#18181B', card: '#27272A', text: '#FAFAFA', accent: '#FACC15', secondary: '#FB923C' }
+];
+
+function renderCustomPanel(container) {
+  const c = getCustomColors();
+  let panel = container.querySelector('.custom-theme-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'custom-theme-panel';
+    container.appendChild(panel);
+  }
+
+  panel.innerHTML = `
+    <div class="discover-label">Custom Palette Colors</div>
+    <div class="custom-color-grid">
+      <div class="custom-color-item">
+        <span class="custom-color-label">Background</span>
+        <div class="custom-color-picker-wrap">
+          <input type="color" class="custom-color-input" id="cc-bg" value="${c.bg}">
+          <span class="custom-color-hex">${c.bg}</span>
+        </div>
+      </div>
+      <div class="custom-color-item">
+        <span class="custom-color-label">Cards & Modals</span>
+        <div class="custom-color-picker-wrap">
+          <input type="color" class="custom-color-input" id="cc-card" value="${c.card}">
+          <span class="custom-color-hex">${c.card}</span>
+        </div>
+      </div>
+      <div class="custom-color-item">
+        <span class="custom-color-label">Primary Accent</span>
+        <div class="custom-color-picker-wrap">
+          <input type="color" class="custom-color-input" id="cc-accent" value="${c.accent}">
+          <span class="custom-color-hex">${c.accent}</span>
+        </div>
+      </div>
+      <div class="custom-color-item">
+        <span class="custom-color-label">Secondary Highlight</span>
+        <div class="custom-color-picker-wrap">
+          <input type="color" class="custom-color-input" id="cc-secondary" value="${c.secondary}">
+          <span class="custom-color-hex">${c.secondary}</span>
+        </div>
+      </div>
+      <div class="custom-color-item">
+        <span class="custom-color-label">Text Color</span>
+        <div class="custom-color-picker-wrap">
+          <input type="color" class="custom-color-input" id="cc-text" value="${c.text}">
+          <span class="custom-color-hex">${c.text}</span>
+        </div>
+      </div>
+    </div>
+    <div class="custom-presets-row">
+      <span class="custom-color-label" style="width:100%; margin-top:0.4rem;">Quick Presets:</span>
+      ${PRESET_PALETTES.map((p, i) => `
+        <button class="preset-chip" data-preset-idx="${i}">${escapeHtml(p.name)}</button>
+      `).join('')}
+    </div>
+  `;
+
+  const bindPicker = (id, key) => {
+    const input = panel.querySelector(`#cc-${id}`);
+    if (!input) return;
+    input.addEventListener('input', e => {
+      const val = e.target.value;
+      input.nextElementSibling.textContent = val;
+      saveCustomColors({ [key]: val });
+    });
+  };
+
+  bindPicker('bg', 'bg');
+  bindPicker('card', 'card');
+  bindPicker('accent', 'accent');
+  bindPicker('secondary', 'secondary');
+  bindPicker('text', 'text');
+
+  panel.querySelectorAll('.preset-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.presetIdx);
+      const p = PRESET_PALETTES[idx];
+      if (p) {
+        saveCustomColors({ bg: p.bg, card: p.card, text: p.text, accent: p.accent, secondary: p.secondary });
+        renderThemePicker();
+      }
+    });
+  });
+}
+
+function renderThemePicker() {
+  const themeGrid = document.getElementById('theme-options-grid');
+  const themeModal = document.getElementById('theme-modal');
+  if (!themeGrid) return;
+  const current = getTheme();
+  const customCols = getCustomColors();
+
+  themeGrid.innerHTML = MARQUEE_THEMES.map(t => {
+    const isCustom = t.id === 'custom';
+    const primary = isCustom ? customCols.accent : t.primary;
+    const card = isCustom ? customCols.card : t.card;
+    const accent = isCustom ? customCols.secondary : t.accent;
+
+    return `
+      <div class="theme-card ${t.id === current ? 'active' : ''}" data-theme-id="${t.id}">
+        <div class="theme-card-head">
+          <span class="theme-card-title">${escapeHtml(t.name)}</span>
+          <div class="theme-swatches">
+            <span class="theme-swatch" style="background:${primary};"></span>
+            <span class="theme-swatch" style="background:${card};"></span>
+            <span class="theme-swatch" style="background:${accent};"></span>
+          </div>
+        </div>
+        <div class="theme-card-desc">${escapeHtml(t.desc)}</div>
+      </div>
+    `;
+  }).join('');
+
+  const modalCard = themeModal?.querySelector('.theme-modal-card');
+  if (current === 'custom' && modalCard) {
+    renderCustomPanel(modalCard);
+  } else {
+    modalCard?.querySelector('.custom-theme-panel')?.remove();
+  }
+}
+
+function setupThemePicker() {
+  const themeModal = document.getElementById('theme-modal');
+  const themeGrid = document.getElementById('theme-options-grid');
+  const themeBtn = document.getElementById('theme-btn');
+  const closeThemeModalBtn = document.getElementById('close-theme-modal-btn');
+
+  if (!themeBtn || !themeModal) return;
+
+  themeBtn.addEventListener('click', () => {
+    renderThemePicker();
+    themeModal.classList.remove('hidden');
+  });
+
+  if (closeThemeModalBtn) {
+    closeThemeModalBtn.addEventListener('click', () => themeModal.classList.add('hidden'));
+  }
+
+  if (themeGrid) {
+    themeGrid.addEventListener('click', e => {
+      const card = e.target.closest('.theme-card');
+      if (!card) return;
+      const id = card.dataset.themeId;
+      if (id) {
+        setTheme(id);
+        renderThemePicker();
+      }
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupThemePicker);
+} else {
+  setupThemePicker();
+}
+
+
 

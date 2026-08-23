@@ -8,6 +8,29 @@
 <link rel="stylesheet" href="style.css?v={{ASSET_VERSION}}">
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<script>
+(function() {
+  var t = localStorage.getItem('marquee-theme') || 'marquee-light';
+  document.documentElement.setAttribute('data-theme', t);
+  if (t === 'custom') {
+    try {
+      var c = JSON.parse(localStorage.getItem('marquee-custom-colors') || '{}');
+      var r = document.documentElement;
+      if (c.bg) r.style.setProperty('--custom-bg', c.bg);
+      if (c.card) r.style.setProperty('--custom-card', c.card);
+      if (c.text) r.style.setProperty('--custom-text', c.text);
+      if (c.accent) {
+        r.style.setProperty('--custom-accent', c.accent);
+        r.style.setProperty('--custom-accent-transparent', c.accent + '40');
+      }
+      if (c.secondary) {
+        r.style.setProperty('--custom-secondary', c.secondary);
+        r.style.setProperty('--custom-sec-transparent', c.secondary + '40');
+      }
+    } catch (e) {}
+  }
+})();
+</script>
 </head>
 <body>
 
@@ -21,6 +44,7 @@
         <div class="logo-tag">Admin</div>
       </div>
       <div class="hero-icons">
+        <button id="theme-btn" class="icon-btn" aria-label="Theme System" title="Theme System">&#127912;</button>
         <a href="/" class="icon-btn" aria-label="Back to dashboard">&#8592;</a>
         <button id="open-settings-btn" class="icon-btn" aria-label="Settings">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -231,6 +255,18 @@
       <button id="settings-edit-cancel-btn" class="pill-btn">Cancel</button>
       <button id="settings-edit-save-btn" class="btn-primary" disabled>Save Changes</button>
     </div>
+  </div>
+</div>
+
+<!-- THEME PICKER MODAL -->
+<div id="theme-modal" class="modal hidden">
+  <div class="modal-card theme-modal-card">
+    <div class="modal-head">
+      <div class="modal-title">Theme System</div>
+      <button id="close-theme-modal-btn" class="pill-btn pill-btn-icon" aria-label="Close">&#215;</button>
+    </div>
+    <div class="discover-label" style="margin-top: 0.5rem;">Select your preferred visual style</div>
+    <div class="theme-grid" id="theme-options-grid"></div>
   </div>
 </div>
 
