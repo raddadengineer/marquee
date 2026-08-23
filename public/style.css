@@ -1175,7 +1175,19 @@ body {
    a flex column itself (min-height:0 so overflow-y:auto below actually kicks
    in instead of the card just growing past its max-height). */
 #search-tab, #myrequests-tab, #mystats-tab, #season-picker, #report-search-view, #report-browse-view, #report-form-view {
-  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+}
+
+#search-results,
+.my-requests-list,
+#mystats-body,
+.season-list,
+.theme-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Report modal's browse view (show -> seasons -> episodes) — plain clickable
