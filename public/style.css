@@ -323,7 +323,6 @@ body {
 }
 
 .avatar-chip {
-.avatar-chip {
   display: flex;
   align-items: center;
   gap: 0.55rem;
