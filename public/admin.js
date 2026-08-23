@@ -1080,10 +1080,23 @@ async function loadPrivacySettings() {
     const privacy = await api('/api/settings/privacy');
     if (document.getElementById('privacy-stream-user-input')) {
       document.getElementById('privacy-stream-user-input').value = privacy.PRIVACY_STREAM_USER_IDENTITY || 'full';
+      document.getElementById('privacy-custom-label-input').value = privacy.PRIVACY_CUSTOM_USER_LABEL || 'Family Member';
       document.getElementById('privacy-stream-media-input').value = privacy.PRIVACY_STREAM_MEDIA_CONTENT || 'full_details';
       document.getElementById('privacy-stream-tech-input').value = privacy.PRIVACY_STREAM_TECHNICAL || 'full_technical';
+      document.getElementById('privacy-allow-self-view-input').checked = privacy.PRIVACY_STREAM_ALLOW_SELF_VIEW !== 'false';
+      document.getElementById('privacy-own-only-input').checked = privacy.PRIVACY_STREAM_OWN_ONLY === 'true';
       document.getElementById('privacy-metrics-input').value = privacy.PRIVACY_SYSTEM_METRICS || 'full_paths';
       document.getElementById('privacy-stats-input').value = privacy.PRIVACY_STATS || 'full_leaderboard';
+      document.getElementById('privacy-show-requester-input').checked = privacy.PRIVACY_HIDE_REQUESTER !== 'true';
+      document.getElementById('privacy-my-requests-only-input').checked = privacy.PRIVACY_MY_REQUESTS_ONLY === 'true';
+
+      if (document.getElementById('vis-now-playing')) document.getElementById('vis-now-playing').checked = privacy.VISIBILITY_NOW_PLAYING !== 'false';
+      if (document.getElementById('vis-top-watched')) document.getElementById('vis-top-watched').checked = privacy.VISIBILITY_TOP_WATCHED !== 'false';
+      if (document.getElementById('vis-storage')) document.getElementById('vis-storage').checked = privacy.VISIBILITY_STORAGE !== 'false';
+      if (document.getElementById('vis-grab-status')) document.getElementById('vis-grab-status').checked = privacy.VISIBILITY_GRAB_STATUS !== 'false';
+      if (document.getElementById('vis-recently-added')) document.getElementById('vis-recently-added').checked = privacy.VISIBILITY_RECENTLY_ADDED !== 'false';
+      if (document.getElementById('vis-airing-today')) document.getElementById('vis-airing-today').checked = privacy.VISIBILITY_AIRING_TODAY !== 'false';
+      if (document.getElementById('vis-upcoming')) document.getElementById('vis-upcoming').checked = privacy.VISIBILITY_UPCOMING !== 'false';
     }
   } catch (e) {
     console.error('Failed to load privacy settings', e);
@@ -1092,26 +1105,45 @@ async function loadPrivacySettings() {
 
 document.getElementById('privacy-preset-strict')?.addEventListener('click', () => {
   document.getElementById('privacy-stream-user-input').value = 'mask_usernames';
+  document.getElementById('privacy-custom-label-input').value = 'Guest';
   document.getElementById('privacy-stream-media-input').value = 'category_only';
   document.getElementById('privacy-stream-tech-input').value = 'hide_all_transcode';
+  document.getElementById('privacy-allow-self-view-input').checked = false;
+  document.getElementById('privacy-own-only-input').checked = true;
   document.getElementById('privacy-metrics-input').value = 'percent_only';
   document.getElementById('privacy-stats-input').value = 'disable_leaderboard';
+  document.getElementById('privacy-show-requester-input').checked = false;
+  document.getElementById('privacy-my-requests-only-input').checked = true;
 });
 
 document.getElementById('privacy-preset-family')?.addEventListener('click', () => {
   document.getElementById('privacy-stream-user-input').value = 'generic_labels';
+  document.getElementById('privacy-custom-label-input').value = 'Family Member';
   document.getElementById('privacy-stream-media-input').value = 'show_name_only';
   document.getElementById('privacy-stream-tech-input').value = 'hide_network_ip';
+  document.getElementById('privacy-allow-self-view-input').checked = true;
+  document.getElementById('privacy-own-only-input').checked = false;
   document.getElementById('privacy-metrics-input').value = 'mask_paths';
   document.getElementById('privacy-stats-input').value = 'anonymous_leaderboard';
+  document.getElementById('privacy-show-requester-input').checked = true;
+  document.getElementById('privacy-my-requests-only-input').checked = false;
 });
 
 document.getElementById('privacy-preset-full')?.addEventListener('click', () => {
   document.getElementById('privacy-stream-user-input').value = 'full';
+  document.getElementById('privacy-custom-label-input').value = 'Family Member';
   document.getElementById('privacy-stream-media-input').value = 'full_details';
   document.getElementById('privacy-stream-tech-input').value = 'full_technical';
+  document.getElementById('privacy-allow-self-view-input').checked = true;
+  document.getElementById('privacy-own-only-input').checked = false;
   document.getElementById('privacy-metrics-input').value = 'full_paths';
   document.getElementById('privacy-stats-input').value = 'full_leaderboard';
+  document.getElementById('privacy-show-requester-input').checked = true;
+  document.getElementById('privacy-my-requests-only-input').checked = false;
+  ['vis-now-playing','vis-top-watched','vis-storage','vis-grab-status','vis-recently-added','vis-airing-today','vis-upcoming'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = true;
+  });
 });
 
 document.getElementById('privacy-save-btn')?.addEventListener('click', async () => {
@@ -1122,10 +1154,22 @@ document.getElementById('privacy-save-btn')?.addEventListener('click', async () 
 
   const changes = {
     PRIVACY_STREAM_USER_IDENTITY: document.getElementById('privacy-stream-user-input').value,
+    PRIVACY_CUSTOM_USER_LABEL: document.getElementById('privacy-custom-label-input').value.trim() || 'Family Member',
     PRIVACY_STREAM_MEDIA_CONTENT: document.getElementById('privacy-stream-media-input').value,
     PRIVACY_STREAM_TECHNICAL: document.getElementById('privacy-stream-tech-input').value,
+    PRIVACY_STREAM_ALLOW_SELF_VIEW: document.getElementById('privacy-allow-self-view-input').checked ? 'true' : 'false',
+    PRIVACY_STREAM_OWN_ONLY: document.getElementById('privacy-own-only-input').checked ? 'true' : 'false',
     PRIVACY_SYSTEM_METRICS: document.getElementById('privacy-metrics-input').value,
-    PRIVACY_STATS: document.getElementById('privacy-stats-input').value
+    PRIVACY_STATS: document.getElementById('privacy-stats-input').value,
+    PRIVACY_HIDE_REQUESTER: document.getElementById('privacy-show-requester-input').checked ? 'false' : 'true',
+    PRIVACY_MY_REQUESTS_ONLY: document.getElementById('privacy-my-requests-only-input').checked ? 'true' : 'false',
+    VISIBILITY_NOW_PLAYING: document.getElementById('vis-now-playing').checked ? 'true' : 'false',
+    VISIBILITY_TOP_WATCHED: document.getElementById('vis-top-watched').checked ? 'true' : 'false',
+    VISIBILITY_STORAGE: document.getElementById('vis-storage').checked ? 'true' : 'false',
+    VISIBILITY_GRAB_STATUS: document.getElementById('vis-grab-status').checked ? 'true' : 'false',
+    VISIBILITY_RECENTLY_ADDED: document.getElementById('vis-recently-added').checked ? 'true' : 'false',
+    VISIBILITY_AIRING_TODAY: document.getElementById('vis-airing-today').checked ? 'true' : 'false',
+    VISIBILITY_UPCOMING: document.getElementById('vis-upcoming').checked ? 'true' : 'false'
   };
 
   try {

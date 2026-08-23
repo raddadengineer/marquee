@@ -1596,12 +1596,28 @@ body {
   margin: 0.5rem 0 0;
 }
 
-.report-status.ok {
-  color: var(--teal);
+.privacy-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.83rem;
+  color: var(--text);
+  margin-top: 0.4rem;
+  cursor: pointer;
 }
 
-.report-status.error {
-  color: var(--danger);
+.privacy-toggle-label input[type="checkbox"] {
+  accent-color: var(--teal);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.privacy-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem 0.75rem;
+  margin-top: 0.35rem;
 }
 
 /* Open issues admin rows — reuses .pending-row/.pending-requester/.pending-actions

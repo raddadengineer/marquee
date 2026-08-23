@@ -255,9 +255,15 @@
         <select id="privacy-stream-user-input" class="settings-input-full">
           <option value="full">Full Usernames &amp; Avatars</option>
           <option value="mask_usernames">Mask Usernames (User ***)</option>
-          <option value="generic_labels">Generic Labels (Family Member / Guest)</option>
+          <option value="generic_labels">Generic Custom Label</option>
           <option value="hide_identity">Hide User Names &amp; Avatars Completely</option>
         </select>
+      </div>
+
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Custom Masked Username Label</label>
+        <input id="privacy-custom-label-input" class="settings-input-full" type="text" placeholder="e.g. Family Member or Cinema Guest">
+        <p class="settings-field-block-desc">Used when Stream User Identity is set to "Generic Custom Label".</p>
       </div>
 
       <div class="settings-field-block">
@@ -281,6 +287,12 @@
       </div>
 
       <div class="settings-field-block">
+        <label class="settings-field-block-label">Stream Scope &amp; Self-View Rules</label>
+        <label class="privacy-toggle-label"><input type="checkbox" id="privacy-allow-self-view-input" checked> Allow users to view their own streams in 100% full detail</label>
+        <label class="privacy-toggle-label"><input type="checkbox" id="privacy-own-only-input"> Hide all other users' active streams entirely (Own streams only)</label>
+      </div>
+
+      <div class="settings-field-block">
         <label class="settings-field-block-label">Storage &amp; Volume Metrics</label>
         <select id="privacy-metrics-input" class="settings-input-full">
           <option value="full_paths">Full Drive Paths &amp; Capacity</option>
@@ -296,6 +308,25 @@
           <option value="anonymous_leaderboard">Anonymous Leaderboard (User #1, User #2)</option>
           <option value="disable_leaderboard">Disable Leaderboard for Non-Admins</option>
         </select>
+      </div>
+
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Request &amp; Issue Privacy</label>
+        <label class="privacy-toggle-label"><input type="checkbox" id="privacy-show-requester-input" checked> Show requester username on activity feed &amp; download cards</label>
+        <label class="privacy-toggle-label"><input type="checkbox" id="privacy-my-requests-only-input"> Limit non-admins to viewing only their own requests in "My Requests"</label>
+      </div>
+
+      <div class="settings-field-block">
+        <label class="settings-field-block-label">Non-Admin Bento Panel Visibility</label>
+        <div class="privacy-panel-grid">
+          <label class="privacy-toggle-label"><input type="checkbox" id="vis-now-playing" checked> Now Playing (Streams)</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="vis-top-watched" checked> Top of the Month</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="vis-storage" checked> Storage Capacity</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="vis-grab-status" checked> Grab Progress</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="vis-recently-added" checked> Recently Added</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="vis-airing-today" checked> Airing Today</label>
+          <label class="privacy-toggle-label"><input type="checkbox" id="vis-upcoming" checked> Releasing Soon</label>
+        </div>
       </div>
 
       <div class="settings-edit-actions" style="margin-top: 1.2rem;">
