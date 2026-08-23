@@ -1670,8 +1670,8 @@ body {
    overflowing their column and getting clipped by the modal's own edge. */
 @media (max-width: 480px) { .service-grid { grid-template-columns: 1fr; } }
 .service-card {
-  min-width: 0; border: 1px solid rgba(20,25,35,0.08); border-radius: 12px;
-  padding: 0.85rem; background: rgba(255,255,255,0.5);
+  min-width: 0; border: 1px solid var(--input-border); border-radius: 12px;
+  padding: 0.85rem; background: var(--input-bg); color: var(--text);
 }
 .service-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; }
 /* Same shrink priority as the foot row below — the name truncates before
@@ -1679,14 +1679,14 @@ body {
    is ever allowed to shrink, so every card's badge stays visually uniform. */
 .service-card-name {
   font-weight: 600; font-size: 0.88rem; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
 }
 .service-badge {
   font-family: var(--mono); font-size: 0.64rem; padding: 0.2rem 0.5rem; border-radius: 20px;
   border: 1px solid; white-space: nowrap; flex-shrink: 0;
 }
 .service-badge.online { color: var(--teal); border-color: rgba(15,143,118,0.35); background: rgba(15,143,118,0.08); }
-.service-badge.unconfigured { color: var(--muted); border-color: rgba(20,25,35,0.12); background: rgba(20,25,35,0.04); }
+.service-badge.unconfigured { color: var(--muted); border-color: var(--input-border); background: var(--input-bg); }
 .service-badge.error { color: var(--danger); border-color: rgba(214,69,69,0.35); background: rgba(214,69,69,0.08); }
 .service-card-meta {
   font-family: var(--mono); font-size: 0.72rem; color: var(--muted); min-height: 1.1em;
