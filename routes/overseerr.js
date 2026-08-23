@@ -5,7 +5,6 @@ const requireOwner = require('./requireOwner');
 const overseerrSession = require('../lib/overseerrSession');
 const rateLimit = require('../lib/rateLimit');
 const sse = require('../lib/sse');
-const pushNotify = require('../lib/pushNotify');
 const tautulliMedia = require('../lib/tautulliMedia');
 const { adminClient, mapDiscoverItem } = require('../lib/overseerrClient');
 const downloadQueueIds = require('../lib/downloadQueueIds');
@@ -366,11 +365,6 @@ router.post('/webhook', (req, res) => {
   const { notification_type, subject, image } = req.body;
   if (notification_type === 'MEDIA_AVAILABLE') {
     sse.broadcast('media-available', { title: subject, poster: image });
-    // Same audience as the SSE toast above — reaches anyone subscribed even
-    // if they don't have the dashboard open in a tab right now, which is the
-    // whole point of push over SSE.
-    pushNotify.notifyAll({ title: 'Now available', body: subject, icon: image })
-      .catch(err => console.error('push notify error:', err.message));
   }
 });
 

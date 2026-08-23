@@ -1,6 +1,45 @@
 # Roadmap
 
-## Shipped
+Every shipped feature or fix gets its own version bump now (`package.json`
++ `package-lock.json`) and its own section here — no more letting the
+version drift unversioned between batches. One bump per shipped unit of
+work: a new capability bumps minor, a fix bumps patch. `git commit`/push
+themselves now batch to every 10th shipped unit instead of running every
+time (version bumps, TODO.md sections, and live deploys still happen every
+time regardless — only the git commit action batches). **Current version:
+v1.5.1.**
+
+`v1.1.0` through `v1.4.1` below are a one-time retroactive reconstruction —
+package.json had said `1.1.0` since the batch that first added a version
+footer, and everything from `v1.2.0` on had actually shipped already with
+no version bump at all (13 commits' worth), so those got grouped into what
+the bumps should have been after the fact. Everything from here forward
+gets versioned as it ships, not reconstructed later.
+
+## Versions at a glance
+
+- **v1.1.0 and earlier** — foundation: dashboard panels, request/download
+  flow, admin console + Stack tools, security fixes, perf audit, Web Push
+- **v1.2.0** — Releasing Soon "Downloaded" parity, My Stats tab, Watchlist
+  tab removed
+- **v1.2.1** — fix: Now Playing/Recently Watched poster flicker
+- **v1.3.0** — Now Playing live elapsed/ETA counter
+- **v1.3.1** — fix: counter sync accuracy (exact `view_offset`)
+- **v1.4.0** — track a release grab through to done
+- **v1.4.1** — fix batch: admin poster flicker, grab-status timing, Notice
+  Board clipped text, avatar chip label
+- **v1.4.2** — fix: notification bell failed silently
+- **v1.4.3** — fix: bell's real root cause on Safari (implicit permission
+  prompt unreliable there)
+- **v1.5.0** — Web Push removed entirely (notification bell, subscribe/
+  unsubscribe, VAPID)
+- **v1.5.1** — fix: Download Queue/Download Issues poster-blink-class DOM
+  churn on every poll
+
+---
+
+## v1.1.0 and earlier
+
 - [x] Now Playing — live push updates via Plex WebSocket + SSE, header
       shows total bandwidth alongside the stream count (Tautulli's own
       aggregate, not a manual per-session sum)
@@ -274,5 +313,329 @@
       batch as a real minor release rather than silently accumulating forever
       under the original number. Verified live on both pages, correctly
       showing this deployment's site name, the new version, and the year
+
+## v1.2.0 — Releasing Soon parity, My Stats, Watchlist removed
+
+- [x] Releasing Soon now shows a "Downloaded" status label under any movie
+      already in the library, matching Airing Today's existing Airing/
+      Downloaded pattern — the /api/radarr/upcoming endpoint already
+      returned `hasFile`, so this was frontend-only. Caught a real bug in
+      the process: the deploy landed on disk via `docker cp` but the
+      container was never restarted, so the immutable-cached `app.js?v=...`
+      bundle from the perf-audit caching scheme kept serving the old code
+      to browsers/Cloudflare regardless — restarting to bump the deploy
+      timestamp fixed it. Static frontend deploys now always restart, not
+      just backend changes
+- [x] My Stats — a fourth tab in the request modal (Search / My Requests /
+      Watchlist / My Stats), reachable from the avatar chip which is now
+      clickable. Per-signed-in-user, same pattern as My Requests: hours
+      watched (last 12 months) as a hero number, family rank/binge streak/
+      plays-this-month as tiles, and a top-3 most-watched list reusing Top
+      of the Month's medal styling. Hours/plays-this-month come from
+      Tautulli's get_user_watch_time_stats (one call covers both windows);
+      binge streak and most-watched are computed from raw get_history rows
+      (lib/myStats.js, unit tested); family rank reuses the same
+      get_home_stats call Top of the Month already makes, just widened to
+      365 days. Discovered get_history has no grandparent_thumb (unlike
+      get_recently_added) — fixed by fetching a real poster via
+      get_metadata for just the top-3 results, not every group. Verified
+      live end-to-end against real data (716 hrs/year, rank #2 of 50, real
+      Naruto Shippūden/My Hero Academia/K-ON! posters)
+- [x] My Stats, round 2: dropped the Most Watched poster — now one flat
+      gold/silver/bronze list (medal + title + play count) instead of a big
+      #1 poster tile, so the per-item get_metadata round trip is gone
+      entirely (computeTopWatched no longer needs a ratingKey at all). Added
+      a "Watch Activity" section below it — by-day-of-week and by-hour-of-day
+      breakdowns adapted from Tautulli's own Graphs page
+      (get_plays_by_dayofweek/get_plays_by_hourofday, scoped to this user,
+      y_axis=duration), stacked Movies/TV bars with a legend and hover
+      tooltips, bar heights scaled per-chart to that chart's own tallest
+      bucket. Live TV is dropped from the parsed series — this deployment
+      never has any, so Tautulli's own chart would show a permanently-empty
+      third legend entry. Also caught and fixed a real class-name collision:
+      the stat-tile card class silently inherited `flex: 1 1 35%; min-width:
+      90px` from an unrelated pre-existing Admin Seeding-panel rule of the
+      same name — renamed to mystats-tile. Verified live against real data:
+      correct hours/plays/rank, and the day/hour breakdowns cross-check
+      against each other (a single 2h movie session shows up as both
+      Tuesday's 2h Movies bar and hour 13's 2h Movies bar, same session)
+- [x] Removed the Watchlist tab — it only paid off if someone actually used
+      Plex's own native watchlist feature outside Marquee, and Search/
+      Discover already covers "find something to request." Removed the tab
+      button + pane, the modalTabs entry and its lazy-load wiring, the
+      `/api/watchlist` route, and `lib/plexWatchlist.js` (Plex Discover API
+      client) entirely — nothing else referenced it. Request modal is back
+      to three tabs (Search / My Requests / My Stats). Verified live:
+      `/api/watchlist` now 404s, everything else still responds correctly,
+      clean restart with no errors
+
+## v1.2.1 — Fix: Now Playing/Recently Watched poster flicker
+
+- [x] Fixed Now Playing/Recently Watched flickering every ~10s. Root cause:
+      `renderNowPlaying` did a full `innerHTML` rebuild on every SSE `full`
+      event, recreating every `<img>` from scratch — even the safety-net
+      refresh in lib/nowPlaying.js's `setInterval(refresh, 10000)`, which
+      fires whether or not anything actually changed. It also unconditionally
+      called `renderRecentlyWatched()`, fully re-rendering that panel too on
+      the same timer even though its data is only fetched once on page load.
+      Rewrote `renderNowPlaying` to reconcile rows by `sessionKey` instead —
+      an existing row's `<img>` is now created once and left alone for the
+      life of that session, only text/bar-width update in place; Recently
+      Watched only re-renders when the live session count actually changes.
+      `patchNowPlayingRow` (the lightweight per-event Plex-push path) was
+      untouched aside from re-pointing at the still-separate `.state-word`
+      span. Verified live: clean restart, no errors
+
+## v1.3.0 — Now Playing live elapsed/ETA counter
+
+- [x] Now Playing shows elapsed/total runtime + a wall-clock ETA above the
+      progress bar (e.g. "10:49 / 23:00 · ETA 9:12 PM"), adapted from
+      Tautulli's own activity view. Both computed entirely client-side from
+      data every session already carries (progress % + durationMs) — no new
+      backend field. `formatDuration` (shared.js) does mm:ss below an hour,
+      h:mm:ss at or above; ETA is `now + time remaining`, recomputed on every
+      live update (the full snapshot and the lightweight per-event patch
+      alike) so it stays right through pauses. Mocked up first before
+      building — the mockup surfaced that Tautulli's screenshot doesn't
+      actually show a distinct "buffered ahead" bar segment either, just
+      this same elapsed/ETA overlay, so that's what got built. CSS scoped to
+      `.now-row .bar` rather than a global `.bar` override, since Download
+      Queue/torrent file rows reuse the same `.bar`/`.bar-fill` classes.
+      Verified the formatting logic by hand against known inputs; live
+      verification of the on-screen result still pending an active session
+      to check against (none running at deploy time)
+- [x] Now Playing's elapsed/total/ETA/bar now tick every second instead of
+      only on the ~10s Plex push cadence. Each session gets a `syncedAt`
+      timestamp on every real update (both the full snapshot and the
+      lightweight per-event patch); a 1s `setInterval` interpolates forward
+      from the last known progress using wall-clock time since then
+      (`interpolatedElapsedMs`), frozen in place whenever state isn't
+      'playing' so a pause doesn't look like time is still passing. Every
+      real sync resets the anchor, so interpolation drift can't accumulate
+      beyond one sync interval. Bar width now goes through the same
+      interpolated value (`updateNowBar`) instead of the raw synced
+      percentage, with a `transition: width 1s linear` (scoped to
+      `.now-row .bar-fill` only) so it reads as continuous movement rather
+      than a once-a-second jump. Verified the interpolation math by hand
+      (ticks forward correctly while playing, frozen while paused); live
+      on-screen verification still pending an active session
+
+## v1.3.1 — Fix: counter sync accuracy
+
+- [x] **Fix**: found the counter was ticking smoothly from a slightly wrong
+      starting point. The backend only ever kept a rounded whole-percent
+      `progress_percent` (Tautulli's own field) — reconstructing elapsed
+      time from that discards real precision, up to ~half a percent of
+      runtime off (several seconds on a typical episode). Both Tautulli's
+      `get_activity` and Plex's own push notifications actually carry an
+      exact `view_offset` in ms; added `viewOffsetMs` to `mapSession` and to
+      the `update` SSE payload (lib/nowPlaying.js), and switched
+      `interpolatedElapsedMs` to anchor on that instead of reconstructing
+      from the percentage. Verified against a real live session (someone
+      streaming King of the Hill): reconstructing from the rounded percent
+      was ~4.3s off the real position; confirmed via an authenticated curl
+      request (reconstructed a valid signed session cookie from the sqlite
+      store + SESSION_SECRET) that `/api/tautulli/now-playing` and the SSE
+      `update` stream both now carry the exact value, and that consecutive
+      real updates land ~10s apart matching Plex's own push cadence — the
+      gap the 1s interpolation ticker is there to smooth over
+
+## v1.4.0 — Track a grab through to done
+
+- [x] Track a grab through to done instead of freezing at "Grabbed ✓". Real
+      problem reported: the owner grabbed a replacement release for a
+      reported issue, saw "Grabbed", and had no idea whether it actually
+      downloaded or got imported without going to check Sonarr's own
+      Activity/History directly. The grabbed row now keeps polling in place
+      (same 4s cadence, new `/api/radarr/grab-status` and
+      `/api/sonarr/grab-status` endpoints) through Downloading (%/speed/ETA)
+      -> Importing -> Done (✓ Replaced, with the new file's quality/size) or
+      Failed (the real rejection reason + a "Fix it" button straight into
+      the existing manual-import flow). State classification
+      (`lib/grabStatus.js`, unit tested) reuses the exact same
+      trackedDownloadStatus/statusMessages fields the Import Issues panel
+      already keys off — nothing new on the Radarr/Sonarr integration side,
+      just surfaced live on the row instead of only after the fact in a
+      separate panel. Same shared `openReleaseModal` function backs Open
+      Issues, Wanted/Missing, and Search Library, so this applies to all
+      three without per-call-site changes. Mocked up first. Gives up
+      politely after 5 minutes of polling ("check Import Issues later")
+      rather than polling forever silently; closing the modal early loses
+      nothing since Import Issues independently catches any real stuck
+      import regardless. Verified against two real cases on the live
+      deployment: a genuinely stuck Sonarr import (exact real rejection
+      reason + downloadId returned) and a fully-imported movie (exact real
+      file quality/size/codec returned)
+
+## v1.4.1 — Fix batch: admin flicker, grab timing, Notice Board, avatar label
+
+- [x] Fixed the same poster-blink bug on the admin page — every poll-
+      refreshed list there (Pending Requests 30s, Open Issues 30s, Wanted/
+      Missing 60s, Import Issues 30s) did a full `innerHTML` rebuild each
+      cycle, recreating every `<img>` from scratch, same root cause as the
+      Now Playing/Recently Watched fix earlier. Added a shared
+      `reconcileList(container, items, keyOf, createRow, updateRow)` helper
+      to admin.js and converted all four — an existing row's `<img>` is now
+      created once and left alone, only text/data-* attributes refresh in
+      place. Wanted/Missing needed a real fix along the way, not just a
+      refactor: its click handler looked items up by array index
+      (`data-idx`), which reconciling by a stable key would have silently
+      broken the moment sort order shifted (e.g. a newly-stuck item jumping
+      to the top) — replaced with a real stable key (tmdbId, or
+      tvdbId+season+episode). Open Issues' click handlers read straight off
+      the row's own `dataset` as context for the release-search/file-info
+      flows, so `updateAdminIssueRow` keeps every field current every poll,
+      not just the visible text. Download Issues/Disk Space/Seeding/
+      Indexers were untouched — no images, nothing to flicker. Verified
+      live: all three underlying endpoints (Open Issues, Wanted/Missing,
+      Sonarr queue) still return data matching exactly what the new render
+      functions expect, clean restart with no new errors
+- [x] **Fix**: grab tracking jumped straight to "Replaced" instead of
+      showing Downloading/Importing. Root cause: the "resolve an issue"
+      flow exists specifically to replace a file that's already there, so
+      `hasFile` on the movie/episode is true *before* the grab too — the
+      grab-status endpoint's "not in the queue yet" fallback treated any
+      existing file as proof this specific grab had already succeeded.
+      Fixed by passing `since` (the grab's start time, captured client-side)
+      through to `/grab-status`, and added `isFileFromThisGrab` (lib/
+      grabStatus.js, unit tested) — only counts as done once the file's own
+      `dateAdded` is at/after that timestamp (small buffer for clock skew
+      between this server and Radarr/Sonarr's host). No `since` given falls
+      back to the old (immediate) behavior, so nothing else that might call
+      this endpoint breaks. Verified against Supergirl's real pre-existing
+      file live: `since=now` correctly returns `unknown` instead of
+      `done`; `since=`(a day before the real dateAdded) correctly still
+      returns `done`; no `since` at all matches the prior behavior exactly
+- [x] Avatar chip subtitle changed from "Signed in" to "My Stats" — the
+      chip was already clickable (opens My Stats), but "Signed in" read as
+      plain status text with no hint it was tappable. Mocked up first.
+- [x] **Fix**: Settings → Notice Board's "Nothing posted right now." was
+      visibly clipped at the top. Root cause: `#notice-status-text` reuses
+      `.discover-label`'s shared `-0.35rem` top margin (tuned to tuck it
+      under the search input in the request modal, its original use) — here
+      it's the first thing inside a scrollable settings tab with nothing
+      above it, so the negative margin pulled the text up past the scroll
+      container's own edge. Scoped override (`#notice-status-text { margin-
+      top: 0; }`) rather than touching the shared class, since the request
+      modal's usage is correct as-is. Verified the fresh cache-busted CSS
+      URL actually serves the fix live.
+
+## v1.4.2 — Fix: notification bell failed silently
+
+- [x] **Fix**: the header bell (Web Push subscribe toggle) did nothing when
+      clicked, with no error and no way to tell why. Root cause: the click
+      handler had no error handling at all — service worker readiness, the
+      browser's own permission prompt, subscribe()/unsubscribe(), and the
+      backend round trip can all fail or (for an unanswered permission
+      prompt) just never resolve, and none of that was ever surfaced.
+      Wrapped the whole handler in try/catch with a clear alert() on
+      failure (matching the existing denied-permission alert already used
+      here), added a `btn.disabled` guard against double-clicks during the
+      async chain, and a matching `.icon-btn:disabled` style. Root cause of
+      the *specific* report is still unconfirmed (most likely either a
+      missed/unanswered browser permission prompt or notifications already
+      blocked at the browser level for this site) — the fix makes any of
+      those visible instead of silent, rather than claiming to have
+      reproduced the exact failure.
+
+## v1.4.3 — Fix: bell's real root cause on Safari
+
+- [x] **Fix**: v1.4.2's error surfacing paid off immediately — confirmed
+      live (Safari on Mac) that the alert showed "unknown error" with no
+      permission prompt ever appearing at all, before or after. Ruled out
+      the VAPID key itself (decoded and checked by hand: a valid 65-byte
+      uncompressed P-256 point) and the server (no corresponding error in
+      the logs — this was failing entirely client-side, before ever
+      reaching `/api/push/subscribe`). The code was relying on
+      `pushManager.subscribe()` to implicitly trigger the browser's
+      notification permission prompt, same as Chrome does — Safari doesn't
+      reliably do that; it can reject outright with no prompt shown at all.
+      Now calls `Notification.requestPermission()` explicitly first
+      (the standard cross-browser-safe pattern) before ever calling
+      `subscribe()`. Also improved the error alert to show `name: message`
+      when both are present instead of just `message` alone, in case
+      there's still more to learn from whatever Safari throws next. Deployed
+      live; confirmation that this actually resolves it on Safari is
+      pending a retry.
+
+## v1.5.0 — Web Push removed entirely
+
+- [x] Removed the notification bell and everything behind it: `lib/
+      pushNotify.js`, `lib/pushSubscriptions.js`, `routes/push.js`, the
+      `/api/push` mount in server.js, the `{{VAPID_PUBLIC_KEY}}` template
+      placeholder + script tag, the bell button + its CSS
+      (`.icon-btn.active`/`.icon-btn:disabled`), `initNotifyToggle()` +
+      `urlBase64ToUint8Array()` in app.js, the `push`/`notificationclick`
+      handlers in sw.js, the `pushNotify.notifyAll()` call in the Overseerr
+      webhook handler (the SSE `media-available` broadcast next to it is
+      untouched — that's the in-tab toast, a separate mechanism), the
+      `web-push` npm dependency (via `npm uninstall`, not hand-edited, so
+      package-lock.json stayed consistent), and the VAPID env var block from
+      `.env.example`. The in-app "Available now" SSE toast still works
+      exactly as before — this only removes the without-a-tab-open path.
+      `push.sqlite` (subscription storage) was left alone on disk rather
+      than deleted — orphaned but harmless.
+      <br>Removing `web-push` meant a real image rebuild, not just a
+      `docker cp` patch — and that surfaced a genuinely important gap along
+      the way: the host's actual build-context directory
+      (`/mnt/docker/skyn3t`, what `docker compose build` reads from) had
+      been stale since before this session even started — still had the
+      `/api/watchlist` route from before that removal, package.json still
+      at `1.1.0`. Every deploy this whole session had been `docker cp`
+      patches into the running container's writable layer only, which
+      never touches that source directory. A `docker compose build` at any
+      point would have silently reverted the *entire* session's work back
+      to a stale baseline. Fully re-synced the real local tree there first
+      (`rsync`, excluding `.git`/`node_modules`/`.env`/`data` — the last two
+      to protect the live secrets/sqlite dbs already on the host) before
+      rebuilding, and verified afterward that the NAS-specific Disk Space
+      feature (the most sensitive thing to lose) still returns real
+      physical-volume data post-rebuild, that `/api/watchlist` and
+      `/api/push` both 404, and that other recent auth-gated endpoints
+      (My Stats, grab-status) still respond correctly. Going forward, any
+      change needing a real rebuild (a dependency change, not just static
+      files) needs this same host-tree sync first, every time.
+
+## v1.5.1 — Fix: Download Queue/Download Issues DOM churn on every poll
+
+- [x] Ran a full performance + dead-code audit (unused functions/CSS/
+      dependencies, duplicate logic, commented-out code, render-blocking
+      resources, re-renders, bundle size, caching, N+1 patterns) at the
+      owner's request. Result: the codebase came back almost entirely
+      clean — zero unused functions (checked every `lib/` export
+      cross-file and every top-level function within `app.js`/`admin.js`),
+      zero unused CSS classes (206 checked, comments stripped first after
+      an initial false-positive pass), zero dead npm dependencies, zero
+      leftover debug `console.log`s, no render-blocking scripts (already
+      at the end of `<body>`), no missing lazy-loading, caching already
+      well-configured. One real finding: `/requests/mine`, `/requests/
+      pending`, and `/issues/open` each fire one Overseerr lookup per
+      item — investigated and *not* actionable, a pre-existing comment
+      already documents Overseerr's request/issue APIs have no bulk
+      title/poster lookup, and it's already parallelized; verified live
+      that the high-traffic `/search`/`/discover` endpoints don't have
+      this problem at all (Overseerr's own response already includes
+      title/posterPath directly). The only actionable item: Download
+      Queue (5s poll) and Download Issues (15s poll) were still doing a
+      full `innerHTML` rebuild every cycle — no `<img>` tags in either so
+      no visible flicker, but still unnecessary DOM churn on the app's
+      two most frequent polls.
+- [x] Converted both to the same `reconcileList`-by-key pattern already
+      proven on Now Playing/Recently Watched and 4 admin panels. Added a
+      matching `reconcileList` helper to `app.js` (mirrors the one already
+      in `admin.js` — the two pages don't share modules by design, no
+      bundler). Keyed by `${type}-${id}` (torrent hash / SABnzbd nzo_id
+      are separate namespaces, prefixed to rule out a coincidental
+      collision). Download Queue's owner-only Remove button and Download
+      Issues' Pause/Resume/Force buttons are now added/removed or toggled
+      in place on the persistent row rather than recreated — verified
+      every existing click-handler dependency (`row.dataset.hash`/`.name`
+      for the torrent-details click-through, `row.dataset.id`/`.type` for
+      pause/resume/force/remove) still lines up field-for-field. Both
+      queues were empty at deploy time, so this is verified by careful
+      manual trace-through + the proven track record of this exact
+      pattern elsewhere, not a live visual confirmation against real
+      non-empty data — worth a glance next time something's actually
+      downloading or stuck.
 
 ## Ideas

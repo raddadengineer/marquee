@@ -212,9 +212,6 @@ body {
   cursor: pointer; line-height: 1; text-decoration: none;
 }
 .icon-btn:hover { background: rgba(255,255,255,0.28); }
-/* Notification bell, once subscribed — same amber the rest of the app uses
-   for "on"/active state (download progress bars, disk gauges). */
-.icon-btn.active { background: var(--amber); border-color: var(--amber); }
 /* An SVG child (admin-link-btn) defaults to inline, which leaves a few px of
    baseline whitespace under it even inside a flex-centered parent — block
    avoids that so it centers exactly like the text-glyph icon buttons do. */
@@ -326,6 +323,7 @@ body {
 }
 
 .avatar-chip {
+.avatar-chip {
   display: flex;
   align-items: center;
   gap: 0.55rem;
@@ -336,6 +334,12 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.avatar-chip:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .avatar {
@@ -362,7 +366,7 @@ body {
 
 .hero-mid {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   padding: 0.5rem 1.75rem;
   display: flex;
   justify-content: space-between;
@@ -573,6 +577,18 @@ body {
   background: var(--amber);
 }
 
+/* Now Playing only — elapsed/total + ETA above the bar. Scoped to .now-row
+   (not a global .bar override) since Download Queue/torrent file rows reuse
+   the same .bar/.bar-fill classes and shouldn't be affected. */
+.now-eta { font-family: var(--mono); font-size: 0.64rem; color: var(--muted); text-align: right; line-height: 1.15; white-space: nowrap; }
+.now-eta .sep { opacity: 0.5; margin: 0 0.3em; }
+.now-eta .eta-val { color: var(--text); font-weight: 500; }
+.now-row .bar { margin-top: 2px; }
+/* Smooths the once-a-second interpolated width updates into a continuously
+   advancing bar instead of a visible 1%-per-tick stutter. Scoped to Now
+   Playing only — Download Queue's bar-fill isn't driven by that ticker. */
+.now-row .bar-fill { transition: width 1s linear; }
+
 /* Disk Space panel's per-volume gauge — same amber/danger semantics as
    .bar-fill/.state-dot.danger, just circular instead of linear. pathLength="100"
    on both circles lets stroke-dasharray take a plain percentage directly,
@@ -753,6 +769,76 @@ body {
     row-gap: 1.5rem;
   }
 }
+
+/* ---------- My Stats tab ---------- */
+.stat-hero { text-align: center; padding: 0.4rem 0.5rem 1.1rem; border-bottom: 1px solid rgba(20,25,35,0.08); margin-bottom: 1rem; }
+.stat-hero-num {
+  font-family: var(--display); font-weight: 700; font-size: 2.5rem; line-height: 1; letter-spacing: -0.01em;
+}
+.stat-hero-unit { font-size: 1.05rem; font-weight: 500; color: var(--muted); margin-left: 0.15rem; }
+.stat-hero-cap { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.4rem; }
+.stat-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1.2rem; }
+.mystats-tile {
+  background: rgba(20,25,35,0.03); border: 1px solid rgba(20,25,35,0.06); border-radius: 12px;
+  padding: 0.65rem 0.55rem; text-align: center;
+}
+.stat-tile-val { font-family: var(--display); font-weight: 600; font-size: 1.15rem; color: var(--teal); }
+.stat-tile-val.amber { color: var(--amber); }
+.stat-tile-lbl { font-family: var(--mono); font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.25rem; }
+
+/* Most Watched — text-only, all three ranks in one .medal-rows grid (reusing
+   Top of the Month's own gold/silver/bronze styling above) instead of a big
+   poster tile for #1. medal-rows-full just gives the standalone list a touch
+   more room than the compact runner-up-only version Top of the Month uses. */
+.medal-rows-full { row-gap: 0.65rem; font-size: 0.85rem; padding: 0.2rem 0 0.3rem; }
+.medal-rows-full .medal-badge { font-size: 1.05rem; }
+.medal-name.gold { color: var(--gold); font-weight: 600; }
+
+/* Watch Activity — day-of-week and hour-of-day breakdowns adapted from
+   Tautulli's own Graphs page, scoped to this user, Movies/TV only (this
+   deployment has no Live TV sessions, so that series is dropped rather than
+   shipped as a permanently-empty legend entry). Bar heights are set inline
+   per row (see renderActivityBars in app.js), scaled to that chart's own
+   tallest bucket rather than a fixed max. */
+.chart-sub { font-size: 0.74rem; color: var(--muted); margin: 0 0 0.7rem; }
+.chart-legend {
+  display: flex; gap: 1.1rem; align-items: center; margin-bottom: 1rem;
+  font-family: var(--mono); font-size: 0.68rem; color: var(--muted);
+}
+.chart-legend .dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 0.4rem; vertical-align: -1px; }
+.chart-legend .dot.movies { background: var(--teal); }
+.chart-legend .dot.tv { background: var(--amber); }
+.chart-title { font-family: var(--display); font-weight: 600; font-size: 0.86rem; margin-bottom: 0.6rem; }
+
+.dow-chart {
+  display: flex; align-items: flex-end; gap: 0.55rem; height: 108px;
+  border-bottom: 1px solid rgba(20,25,35,0.12);
+}
+.dow-col {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  height: 100%; cursor: default; transition: filter 0.15s ease;
+}
+.dow-col:hover { filter: brightness(1.08); }
+.dow-seg { width: 100%; max-width: 24px; border-radius: 3px 3px 0 0; }
+.dow-seg.tv { background: var(--amber); }
+.dow-seg.movies { background: var(--teal); border-radius: 0; }
+.dow-labels { display: flex; gap: 0.55rem; margin-top: 0.4rem; }
+.dow-labels span { flex: 1; text-align: center; font-family: var(--mono); font-size: 0.62rem; color: var(--muted); }
+
+.hod-chart {
+  display: flex; align-items: flex-end; gap: 2px; height: 84px;
+  border-bottom: 1px solid rgba(20,25,35,0.12);
+}
+.hod-col {
+  flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%;
+  border-radius: 2px 2px 0 0; overflow: hidden; cursor: default; transition: filter 0.15s ease;
+}
+.hod-col:hover { filter: brightness(1.15); }
+.hod-seg { width: 100%; }
+.hod-seg.tv { background: var(--amber); }
+.hod-seg.movies { background: var(--teal); }
+.hod-labels { display: flex; gap: 2px; margin-top: 0.35rem; }
+.hod-labels span { flex: 1; text-align: center; font-family: var(--mono); font-size: 0.52rem; color: var(--muted); }
 
 /* Admin: Seeding — just a handful of numbers, no file list. Wraps to 2x2 on
    narrow cards instead of squeezing four values onto one line. */
@@ -965,7 +1051,7 @@ body {
    triggered it) sit in the same flex-column .modal-card, so each needs to be
    a flex column itself (min-height:0 so overflow-y:auto below actually kicks
    in instead of the card just growing past its max-height). */
-#search-tab, #myrequests-tab, #watchlist-tab, #season-picker, #report-search-view, #report-browse-view, #report-form-view {
+#search-tab, #myrequests-tab, #mystats-tab, #season-picker, #report-search-view, #report-browse-view, #report-form-view {
   flex: 1; min-height: 0; display: flex; flex-direction: column;
 }
 
@@ -1019,7 +1105,7 @@ body {
   padding: 0.75rem 0.95rem;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(20, 25, 35, 0.1);
-  border-radius: 9px;
+  border-radius: 99px;
   color: var(--text);
   font-family: var(--body);
   font-size: 0.9rem;
@@ -1047,6 +1133,11 @@ body {
 }
 
 .my-requests-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+#mystats-body {
   flex: 1;
   overflow-y: auto;
 }
@@ -1126,7 +1217,6 @@ body {
   color: var(--muted);
   font-family: var(--mono);
 }
-
 /* Season picker — shown instead of requesting a whole TV show outright */
 .season-picker.hidden {
   display: none;
@@ -1433,11 +1523,34 @@ body {
 .release-rejections { font-size: 0.7rem; color: var(--danger); margin-top: 2px; }
 .grab-btn { flex-shrink: 0; }
 
+/* Post-grab tracking — a grabbed release row keeps evolving in place
+   (Grabbed -> Downloading -> Importing -> Done/Failed) instead of freezing
+   at "Grabbed ✓". Reuses the plain .bar/.bar-fill classes (not the .now-row-
+   scoped ones) since this isn't Now Playing. */
+.track-stage {
+  font-family: var(--mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--muted); display: flex; align-items: center; gap: 0.4rem; margin-top: 4px;
+}
+.track-stage .state-dot.amber { background: var(--amber); }
+.track-stage .state-dot.danger { background: var(--danger); }
+.track-stage .state-dot.pulse { animation: track-pulse 1.4s ease-in-out infinite; }
+@keyframes track-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.track-meta { font-size: 0.76rem; color: var(--muted); margin-top: 3px; }
+.track-result-ok { color: var(--teal); font-weight: 600; }
+.track-result-fail { color: var(--danger); }
+.release-row .bar { margin-top: 6px; }
+.fix-it-btn { border-color: rgba(214,69,69,0.35); color: var(--danger); margin-top: 0.5rem; }
+
 /* Settings modal (owner only) — service health grid + per-service/deployment
    edit popups. Saving anything restarts the container (see routes/settings.js),
    since Node only loads .env once at process start. */
 .settings-card { width: min(780px, 94vw); overflow-x: hidden; }
 .settings-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0.5rem 0; }
+/* .discover-label's shared -0.35rem top margin is tuned to tuck it under a
+   search input (its original use) — here it's the first thing in a
+   scrollable settings tab with nothing above it, so that negative margin
+   was clipping the top of the text against the scroll container's edge. */
+#notice-status-text { margin-top: 0; }
 /* wraps instead of squeezing "Run Health Check"/"Edit Deployment Settings"
    into a cramped two-line button next to the heading on narrow screens */
 .settings-section-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.85rem; }

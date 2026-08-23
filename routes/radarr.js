@@ -5,6 +5,7 @@ const requireOwner = require('./requireOwner');
 const { mapReleases } = require('../lib/releaseSearch');
 const { mapFileInfo } = require('../lib/fileInfo');
 const { isConfigured } = require('../lib/services');
+const { classifyQueueRecord, isFileFromThisGrab } = require('../lib/grabStatus');
 const router = express.Router();
 
 router.use((req, res, next) => {
@@ -140,6 +141,57 @@ router.post('/releases/grab', requireAuth, requireOwner, async (req, res) => {
   } catch (err) {
     console.error('radarr grab error:', err.response?.data || err.message);
     res.status(502).json({ error: err.response?.data?.[0]?.errorMessage || 'Could not grab release' });
+  }
+});
+
+// Polled by the release-search modal after a grab so the row can keep
+// tracking through downloading -> importing -> done/failed instead of
+// freezing at "Grabbed ✓" with no idea what actually happened. Reuses the
+// exact same queue fields the Import Issues panel already keys off (see
+// lib/grabStatus.js) — "failed" here is the same condition that would show
+// up there, just surfaced immediately on the row instead of a separate panel.
+router.get('/grab-status', requireAuth, requireOwner, async (req, res) => {
+  const tmdbId = Number(req.query.tmdbId);
+  if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+    return res.status(400).json({ error: 'Invalid tmdbId' });
+  }
+  try {
+    const { data: movies } = await axios.get(`${process.env.RADARR_URL}/api/v3/movie`, {
+      params: { tmdbId },
+      headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
+    });
+    const movie = movies[0];
+    if (!movie) return res.status(404).json({ error: 'Movie not tracked in Radarr' });
+
+    const { data: queueData } = await axios.get(`${process.env.RADARR_URL}/api/v3/queue`, {
+      params: { pageSize: 200 },
+      headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
+    });
+    const rec = (queueData.records || []).find(r => r.movieId === movie.id);
+    if (rec) return res.json(classifyQueueRecord(rec));
+
+    // Not in the queue at all — either already imported, or nothing has
+    // reached Radarr's queue yet (right after a grab, before it's picked up
+    // the release). A file being present isn't enough on its own, though —
+    // this flow exists specifically to replace a file that was already
+    // there (a reported issue), so hasFile is true both before and after a
+    // real replace. Only counts as done once that file's own dateAdded is
+    // at/after this grab's start time (see isFileFromThisGrab).
+    let file = null;
+    if (movie.hasFile && movie.movieFileId) {
+      const { data: mf } = await axios.get(`${process.env.RADARR_URL}/api/v3/moviefile/${movie.movieFileId}`, {
+        headers: { 'X-Api-Key': process.env.RADARR_API_KEY }
+      });
+      file = mapFileInfo(mf);
+    }
+    const sinceMs = Number(req.query.since) || 0;
+    if (file && !isFileFromThisGrab(file, sinceMs)) {
+      return res.json({ stage: 'unknown' });
+    }
+    res.json({ stage: file ? 'done' : 'unknown', file });
+  } catch (err) {
+    console.error('radarr grab-status error:', err.code || err.response?.status, err.message);
+    res.status(502).json({ error: 'Could not check status' });
   }
 });
 
