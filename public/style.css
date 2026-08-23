@@ -1536,14 +1536,48 @@ body {
   width: 100%;
   box-sizing: border-box;
   padding: 0.6rem 0.75rem;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(20, 25, 35, 0.1);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 9px;
   color: var(--text);
   font-family: var(--body);
   font-size: 0.85rem;
   resize: vertical;
   margin-bottom: 0.6rem;
+}
+
+/* Recent Sign-ins (Admin Family Panel) */
+.login-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+}
+
+.login-row + .login-row {
+  border-top: 1px solid var(--input-border);
+}
+
+.login-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+}
+
+.login-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.login-time {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: var(--mono);
 }
 
 #report-message:focus {
